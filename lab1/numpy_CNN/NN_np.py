@@ -3,11 +3,6 @@ import itertools
 from typing import List, Tuple
 
 
-"""
-! In my implementation batch_size is the last dimension of the input and output tensors.
-Maybe will change it to the first dimension later.
-"""
-
 # I need to implement a convolutional neural network with and adam optimizer
 # using only numpy.  
 # I will start by implementing a fully connected layer and build a plain neural network
@@ -30,12 +25,14 @@ class Layer:
 
 
 class FullyConnectedLayer(Layer):
+    
     id_iter = itertools.count()
 
     def __init__(self, n_input_neurons: int, n_output_neurons: int):
+        # id is used to identify the layer's weights and bias in the optimizer
         self.id = next(FullyConnectedLayer.id_iter)
-        self.weights = np.random.randn(n_output_neurons, n_input_neurons) * 0.01
-        self.bias = np.random.randn(n_output_neurons, 1) * 0.01
+        self.weights = np.random.randn(n_input_neurons, n_output_neurons) * 0.01
+        self.bias = np.random.randn(1, n_output_neurons) * 0.01
 
         #! Code below was not used. Was intended to be used in the optimizer
         """
@@ -47,19 +44,20 @@ class FullyConnectedLayer(Layer):
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
-        self.output = np.dot(self.weights, input_) + self.bias
+        self.output = np.dot(self.input_, self.weights) + self.bias
         return self.output
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        # In this implementation input_s and outputs of layers have a dimension for batches.
-        # We could have computed the gradients for each sample in the batch and then averaged them.
-        # Instead we compute the gradients for the whole batch by a single matrix multiplication and then divide by the batch size.
-        batch_size = output_gradient.shape[1]
-        input_gradient = np.dot(self.weights.T, output_gradient) / batch_size
-        self.weights_gradient = np.dot(output_gradient, self.input_.T) / batch_size
-        self.bias_gradient = np.sum(output_gradient, axis=1, keepdims=True) / batch_size
+        # We could have computed the gradients for each sample in the batch
+        # and then averaged them. Instead we compute the gradients for the
+        # whole batch by a single matrix multiplication and then divide by
+        # the batch size.
+        #?! I am not sure why we divide by the batch size 
+        batch_size = output_gradient.shape[0]
+        input_gradient = np.dot(output_gradient, self.weights.T) / batch_size
+        self.weights_gradient = np.dot(self.input_.T, output_gradient) / batch_size
+        self.bias_gradient = np.sum(output_gradient, axis=0, keepdims=True) / batch_size
         self.W_and_b_grad = (self.weights_gradient, self.bias_gradient)
-        
         return input_gradient
     
     def get_W_and_b_ids(self) -> Tuple[str, str]:
@@ -82,22 +80,17 @@ class ActivationLayer(Layer):
         pass
 
 class ReLULayer(ActivationLayer):
-    def __init__(self):
-        pass
-    
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
         return np.maximum(0, input_)
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        input_gradient = output_gradient * (self.input_ > 0)
-        return input_gradient
+        return output_gradient * (self.input_ > 0)
 
 class SigmoidLayer(ActivationLayer):
-    def __init__(self):
-        pass
-    
     def forward(self, input_: np.ndarray) -> np.ndarray:
+        # clip is used to avoid overflow
+        # self.output = 1 / (1 + np.exp(-np.clip(input_, 1e-8, 1e4)))
         self.output = 1 / (1 + np.exp(-input_))
         return self.output
     
@@ -106,48 +99,36 @@ class SigmoidLayer(ActivationLayer):
         return input_gradient
 
 class LinearActivation(ActivationLayer):
-    def __init__(self):
-        pass
-    
     def forward(self, input_: np.ndarray) -> np.ndarray:
         return input_
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         return output_gradient
+        
 
 
 class SoftMaxLayer(Layer):
-    def __init__(self):
-        pass
-    
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        """
-        input is a matrix of shape (n_classes, batch_size)
-        """
-        self.input_ = input_
-        self.output = np.exp(input_) / np.sum(np.exp(input_), axis=0, keepdims=True)
+        self.output = np.exp(input_) / np.sum(np.exp(input_), axis=1, keepdims=True)
         return self.output
     
     #! backward needs to be checked
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        input_gradient = np.dot(self.output, (1 - self.output).T) * output_gradient
-        return input_gradient
+        return output_gradient * self.output * (1 - self.output)
+
+        
 
 class CrossEntropyLoss(Layer):
-    def __init__(self):
-        pass
-    
     def forward(self, pred: np.ndarray, target: np.ndarray) -> float:
         self.pred = pred
         self.target = target
-        batch_size = pred.shape[1]
-        # The line below makes a division by zero
-        # The re
-        return -np.sum(np.dot(np.log(pred),target.T) + np.dot(np.log(1 - pred), (1 - target).T)) / batch_size
-
+        batch_size = pred.shape[0]
+        # summing over the batch and then dividing by the batch size
+        # The line below makes a division by zero error at some point
+        return -np.sum(np.dot(self.target, np.log(self.pred).T)) / batch_size
     
     def backward(self) -> np.ndarray:
-        return - (np.divide(self.target, self.pred) - np.divide(1 - self.target, 1 - self.pred))
+        return - self.target / self.pred
 
 
 class Optimizer:
@@ -210,18 +191,18 @@ class AdamOptimizer(Optimizer):
             # On the other hand, the commented code below might be more readable
             # and it updates the parameters explicitly so we immediately see what's going on.
 
-            
+            """
             for gradient, cache_id, parameter in zip(layer.W_and_b_grad, layer.get_W_and_b_ids(), (layer.weights, layer.bias)):                
                 self.update(gradient, cache_id)
                 parameter -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
-
             """
+            
             W_id, b_id = layer.get_W_and_b_ids()
-            self.update(layer.weights_gradient)
+            self.update(layer.weights_gradient, W_id)
             layer.weights -= self.learning_rate * self.m[W_id] / (np.sqrt(self.v[W_id]) + self.epsilon)
-            self.update(layer.bias_gradient)
+            self.update(layer.bias_gradient, b_id)
             layer.bias -= self.learning_rate * self.m[b_id] / (np.sqrt(self.v[b_id]) + self.epsilon)
-            """
+            
         self.t += 1
 
 # ? May be put this dictionary in a Base class of all Activation Layers?
