@@ -48,15 +48,11 @@ class FullyConnectedLayer(Layer):
         return self.output
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        # We could have computed the gradients for each sample in the batch
-        # and then averaged them. Instead we compute the gradients for the
-        # whole batch by a single matrix multiplication and then divide by
-        # the batch size.
-        #?! I am not sure why we divide by the batch size 
+        # The math explanation: https://web.eecs.umich.edu/~justincj/teaching/eecs442/notes/linear-backprop.html
         batch_size = output_gradient.shape[0]
-        input_gradient = np.dot(output_gradient, self.weights.T) / batch_size
-        self.weights_gradient = np.dot(self.input_.T, output_gradient) / batch_size
-        self.bias_gradient = np.sum(output_gradient, axis=0, keepdims=True) / batch_size
+        input_gradient = np.dot(output_gradient, self.weights.T)
+        self.weights_gradient = np.dot(self.input_.T, output_gradient)
+        self.bias_gradient = np.sum(output_gradient, axis=0, keepdims=True)
         self.W_and_b_grad = (self.weights_gradient, self.bias_gradient)
         return input_gradient
     
@@ -90,13 +86,12 @@ class ReLULayer(ActivationLayer):
 class SigmoidLayer(ActivationLayer):
     def forward(self, input_: np.ndarray) -> np.ndarray:
         # clip is used to avoid overflow
-        # self.output = 1 / (1 + np.exp(-np.clip(input_, 1e-8, 1e4)))
-        self.output = 1 / (1 + np.exp(-input_))
+        self.output = 1 / (1 + np.exp(-np.clip(input_, 1e-8, 1e2)))
+        # self.output = 1 / (1 + np.exp(-input_))
         return self.output
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        input_gradient = output_gradient * self.output * (1 - self.output)
-        return input_gradient
+        return output_gradient * self.output * (1 - self.output)
 
 class LinearActivation(ActivationLayer):
     def forward(self, input_: np.ndarray) -> np.ndarray:
@@ -141,19 +136,14 @@ class Optimizer:
 
 class AdamOptimizer(Optimizer):
     """
-    ! Now I realised that I need to store m and v for each layer.
-    I think that a good patch would be to store a dictionary of m and v for each layer.
-    A dict's key would be the layer's id and the value would be a tuple of m and v.
-    May be layer's id is not the best choice since we work with gradients. 
-    But gradients are mutable and we can't use them as keys. We give weights and biases ids and
-    make gradients classes that encapsulate the gradient arrays and the id of the weights and biases.
+    I store m and v values for each weight gradient and bias gradient
+    in dictionaries m and v where the key is the id of the parameter matrix
+    which has the form "dW{layer_id}" or "db{layer_id}". Thus, the parameter
+    matrix ids serve as gradient matrix ids.
+    
     This solution works but I'm not sure that this approach could be used in a graph based computation. 
-    I think that this hardship is a reason to switch to developing a graph based computation.
 
-    Since all the layers store their weights and biases we CAN use the layer's id as the key of the dictionary.
-
-    Another option would be to have an instance of AdamOptimizer for each layer but I think that
-    the first option is better.
+    There's also an ugly option to have an instance of AdamOptimizer for each.
     """
     #!? Maybe we should implement a class of a TrainableLayer that inherits from Layer. 
     def __init__(self, trainable_layers: List[Layer], learning_rate: float = 0.001,
@@ -205,8 +195,17 @@ class AdamOptimizer(Optimizer):
             
         self.t += 1
 
-# ? May be put this dictionary in a Base class of all Activation Layers?
-# af_name_to_af_class = {"relu": ReLULayer, "sigmoid": SigmoidLayer, "linear": LinearActivation}
+
+class GradientDescentOptimizer(Optimizer):
+    def __init__(self, trainable_layers: List[Layer], learning_rate: float = 0.001):
+        self.trainable_layers = trainable_layers
+        self.learning_rate = learning_rate
+
+    def step(self) -> None:
+        for layer in self.trainable_layers:
+            layer.weights -= self.learning_rate * layer.weights_gradient
+            layer.bias -= self.learning_rate * layer.bias_gradient
+    
 
 
 class Sequential:
