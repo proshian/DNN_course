@@ -2,17 +2,6 @@ import numpy as np
 import itertools
 from typing import List, Tuple
 
-
-# I need to implement a convolutional neural network with and adam optimizer
-# using only numpy.  
-# I will start by implementing a fully connected layer and build a plain neural network
-# I think I need to implement a layer abstract class
-# The layer class will have virtual methods for forward and backward pass
-# Each succssor of the layer class will implement the forward and backward pass
-
-# I will start with a fully connected layer without inheritance
-
-
 class Layer:
     def __init__(self):
         pass
@@ -49,7 +38,6 @@ class FullyConnectedLayer(Layer):
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         # The math explanation: https://web.eecs.umich.edu/~justincj/teaching/eecs442/notes/linear-backprop.html
-        batch_size = output_gradient.shape[0]
         input_gradient = np.dot(output_gradient, self.weights.T)
         self.weights_gradient = np.dot(self.input_.T, output_gradient)
         self.bias_gradient = np.sum(output_gradient, axis=0, keepdims=True)
@@ -99,19 +87,21 @@ class LinearActivation(ActivationLayer):
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         return output_gradient
-        
 
 
 class SoftMaxLayer(Layer):
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        self.output = np.exp(input_) / np.sum(np.exp(input_), axis=1, keepdims=True)
+        # The output of softmax will be same if we substract some constant c
+        # from the input. It's same as multiplying initial expression by
+        # e^(-c)/e^(-c). The substraction helps to avoid overflow.
+        e_subtracted = np.exp(input_ - np.max(input_, axis=1, keepdims=True)) 
+        self.output = e_subtracted / np.sum(e_subtracted, axis=1, keepdims=True)
         return self.output
     
-    #! backward needs to be checked
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         return output_gradient * self.output * (1 - self.output)
-
-        
+    
+               
 
 class CrossEntropyLoss(Layer):
     def forward(self, pred: np.ndarray, target: np.ndarray) -> float:
@@ -119,12 +109,18 @@ class CrossEntropyLoss(Layer):
         self.target = target
         batch_size = pred.shape[0]
         # summing over the batch and then dividing by the batch size
-        # The line below makes a division by zero error at some point
-        return -np.sum(np.dot(self.target, np.log(self.pred).T)) / batch_size
+        # return -np.sum(np.dot(self.target, np.log(self.cliped_pred()).T)) / batch_size
+        return -np.sum(self.target * np.log(self.cliped_pred())) / batch_size
     
     def backward(self) -> np.ndarray:
-        return - self.target / self.pred
+        return - self.target / self.cliped_pred()
 
+    def cliped_pred(self) -> np.ndarray:
+        # Clip is used to avoid negative values as input to if we don't
+        # use softmax. !Maybe it's better to have an upper bound of 1 so that
+        # the possible values of the input to log are in the range [1e-8, 1]
+        # even if we don't use softmax
+        return np.clip(self.pred, 1e-8, None)
 
 class Optimizer:
     def __init__(self, trainable_layers: List[Layer], learning_rate: float):
@@ -143,9 +139,8 @@ class AdamOptimizer(Optimizer):
     
     This solution works but I'm not sure that this approach could be used in a graph based computation. 
 
-    There's also an ugly option to have an instance of AdamOptimizer for each.
+    There's also an ugly option to have an instance of AdamOptimizer for each parameter.
     """
-    #!? Maybe we should implement a class of a TrainableLayer that inherits from Layer. 
     def __init__(self, trainable_layers: List[Layer], learning_rate: float = 0.001,
                  beta1: float = 0.9, beta2: float = 0.999, epsilon: float = 1e-8):
         #!? maybe we should pass paramters and parameters' ids to the optimizer instead of passing layers
@@ -166,8 +161,6 @@ class AdamOptimizer(Optimizer):
             self.v[W_id] = np.zeros_like(layer.weights)
             self.v[b_id] = np.zeros_like(layer.bias)
         
-    
-
     
     def update(self, gradient: np.ndarray, cache_id: str) -> None:
         self.m[cache_id] = self.beta1 * self.m[cache_id] + (1 - self.beta1) * gradient
@@ -210,25 +203,16 @@ class GradientDescentOptimizer(Optimizer):
 
 class Sequential:
     """
-    This is a feed forward neural network stack.
-    It is defined by two lists: one for the number of neurons in each layer
-    and one for the activation function in each layer.
+    Feed forward neural network stack.
+    Attributes:
+        n_neurons: a list of integers that defines the number of neurons
+            in each layer including the input and output layers.
+        activations: a list of constructors of activation functions. They
+            are applied to the output of each layer. The length of
+            activations should be equal to the len(n_neurons) - 1.
     """
-    #! I think the activations should be a list of classes instead of a list of strings.
-    # The classes should be inherited from an abstract Activation class.
-    # The Activation class should be inherited from a Layer class.
-    # The Layer class should have a forward and a backward method.
-    # the af_name_to_af_class dictionary probably won't be needed.
     def __init__(self, n_neurons: List[int], activations: List[Layer]):
-        """
-        Attributes:
-            n_neurons: a list of integers that defines the number of neurons
-                in each layer including the input and output layers.
-            activations: a list of constructors of activation functions. They
-                are applied to the output of each layer. The length of
-                activations should be equal to the len(n_neurons) - 1.
-
-        """
+        
         self.n_neurons = n_neurons
         self.activations = activations
         self.trainable_layers = []
@@ -250,4 +234,3 @@ class Sequential:
         for layer in reversed(self.layers[:-1]):
             output_gradient = layer.backward(output_gradient)
         return output_gradient
-
