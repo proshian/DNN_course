@@ -89,13 +89,16 @@ class LinearActivation(ActivationLayer):
         return output_gradient
 
 
+def softmax(x: np.ndarray) -> np.ndarray:
+    # The output of softmax will be same if we substract some constant c
+    # from the input. It's same as multiplying initial expression by
+    # e^(-c)/e^(-c). The substraction helps to avoid overflow.
+    e_subtracted = np.exp(x - np.max(x, axis=1, keepdims=True)) 
+    return e_subtracted / np.sum(e_subtracted, axis=1, keepdims=True)
+
 class SoftMaxLayer(Layer):
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        # The output of softmax will be same if we substract some constant c
-        # from the input. It's same as multiplying initial expression by
-        # e^(-c)/e^(-c). The substraction helps to avoid overflow.
-        e_subtracted = np.exp(input_ - np.max(input_, axis=1, keepdims=True)) 
-        self.output = e_subtracted / np.sum(e_subtracted, axis=1, keepdims=True)
+        self.output = softmax(input_)
         return self.output
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
@@ -113,7 +116,8 @@ class CrossEntropyLoss(Layer):
         return -np.sum(self.target * np.log(self.cliped_pred())) / batch_size
     
     def backward(self) -> np.ndarray:
-        return - self.target / self.cliped_pred()
+        batch_size = self.pred.shape[0]
+        return - self.target / self.cliped_pred() / batch_size
 
     def cliped_pred(self) -> np.ndarray:
         # Clip is used to avoid negative values as input to if we don't
@@ -121,6 +125,20 @@ class CrossEntropyLoss(Layer):
         # the possible values of the input to log are in the range [1e-8, 1]
         # even if we don't use softmax
         return np.clip(self.pred, 1e-8, None)
+
+
+class CrossEntropyLossWithSoftMax(Layer):
+    def forward(self, pred: np.ndarray, target: np.ndarray) -> float:
+        self.pred = pred
+        self.target = target
+        sm = softmax(pred)
+        batch_size = pred.shape[0]
+        return -np.sum(self.target * np.log(sm))
+    
+    def backward(self) -> np.ndarray:
+        batch_size = self.pred.shape[0]
+        return self.pred - self.target
+
 
 class Optimizer:
     def __init__(self, trainable_layers: List[Layer], learning_rate: float):
