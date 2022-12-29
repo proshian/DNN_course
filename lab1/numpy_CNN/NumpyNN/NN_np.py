@@ -106,7 +106,7 @@ class SoftMaxLayer(Layer):
     
                
 
-class CrossEntropyLoss(Layer):
+class CrossEntropyLoss:
     def forward(self, pred: np.ndarray, target: np.ndarray) -> float:
         self.pred = pred
         self.target = target
@@ -126,18 +126,16 @@ class CrossEntropyLoss(Layer):
         # even if we don't use softmax
         return np.clip(self.pred, 1e-8, None)
 
-
-class CrossEntropyLossWithSoftMax(Layer):
-    def forward(self, pred: np.ndarray, target: np.ndarray) -> float:
-        self.pred = pred
+class CrossEntropyLossWithSoftMax:
+    def forward(self, activation: np.ndarray, target: np.ndarray) -> float:
+        self.pred = np.clip(softmax(activation), 1e-8, None)
         self.target = target
-        sm = softmax(pred)
-        batch_size = pred.shape[0]
-        return -np.sum(self.target * np.log(sm))
+        batch_size = activation.shape[0]
+        return -np.sum(self.target * np.log(self.pred)) / batch_size
     
     def backward(self) -> np.ndarray:
         batch_size = self.pred.shape[0]
-        return self.pred - self.target
+        return (self.pred - self.target) / batch_size
 
 
 class Optimizer:
