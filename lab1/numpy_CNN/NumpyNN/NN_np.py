@@ -32,6 +32,10 @@ class FullyConnectedLayer(Layer):
         """
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
+        """
+        input_ is a 2D array with shape (batch_size, n_input_neurons)
+        output is a 2D array with shape (batch_size, n_output_neurons)
+        """
         self.input_ = input_
         self.output = np.dot(self.input_, self.weights) + self.bias
         return self.output
@@ -54,6 +58,62 @@ class FullyConnectedLayer(Layer):
     def update_parameter_by_gradient_id(self, gradient_id: str, gradient: np.ndarray):
         self.parameter_by_gradient_id[gradient_id] = gradient
     """
+
+
+class Conv2d(Layer):
+    id_iter = itertools.count()
+
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
+        self.id = next(Conv2d.id_iter)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.bias = bias
+
+        # out_channels is the number of filters and in_channels, kernel_size, kernel_size are the shape of the filter
+        self.weights = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * 0.01
+        if self.bias:
+            self.bias = np.random.randn(out_channels) * 0.01
+        else:
+            self.bias = None
+    
+    def get_padded_input(self, input_: np.ndarray) -> np.ndarray:
+        batch_size, in_channels, height, width = input_.shape
+        padded_height = height + 2 * self.padding
+        padded_width = width + 2 * self.padding
+        padded_input = np.zeros((batch_size, in_channels, padded_height, padded_width))
+        padded_input[:, :, self.padding:self.padding+height, self.padding:self.padding+width] = input_
+        return padded_input
+    
+    # ! May be make convolution a separate function and call it in forward and backward
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        """
+        input_ is a 4D array with shape (batch_size, in_channels, height, width)
+        """
+        self.input_ = input_
+        batch_size, _, height, width = input_.shape
+        padded_input = self.get_padded_input(input_)
+        padded_height = height + 2 * self.padding
+        padded_width = width + 2 * self.padding
+        out_height = (padded_height - self.kernel_size) // self.stride + 1
+        out_width = (padded_width - self.kernel_size) // self.stride + 1
+        output = np.empty((batch_size, self.out_channels, out_height, out_width))
+        # oci stands for output channel index
+        for oci in range(self.out_channels):
+            for h in range(out_height):
+                for w in range(out_width):
+                    output[:, oci, h, w] = np.sum(
+                        self.weights[oci] * padded_input[:, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size],
+                        axis=(1, 2, 3))
+            if self.bias is not None:
+                output[:, oci] += self.bias[oci]
+        return output
+    
+    
+
+
 
 class ActivationLayer(Layer):
     """
