@@ -111,6 +111,31 @@ class Conv2d(Layer):
                 output[:, oci] += self.bias[oci]
         return output
     
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        """
+        output_gradient is a 4D array with shape (batch_size, out_channels, out_height, out_width)
+        """
+        batch_size, out_channels, out_height, out_width = output_gradient.shape
+        _, in_channels, height, width = self.input_.shape
+        padded_input = self.get_padded_input(self.input_)
+        padded_height = height + 2 * self.padding
+        padded_width = width + 2 * self.padding
+        input_gradient = np.zeros((batch_size, in_channels, padded_height, padded_width))
+        self.weights_gradient = np.zeros(self.weights.shape)
+        self.bias_gradient = np.zeros(self.bias.shape)
+        # bi stands for batch index
+        for bi in range(batch_size):
+            for oci in range(out_channels):
+                for h in range(out_height):
+                    for w in range(out_width):
+                        input_gradient[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] += self.weights[oci] * output_gradient[bi, oci, h, w]
+                        self.weights_gradient[oci] += padded_input[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] * output_gradient[bi, oci, h, w]
+                        if self.bias is not None:
+                            self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
+        return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
+
+        
+
     
 
 
@@ -230,6 +255,10 @@ class AdamOptimizer(Optimizer):
         self.t = 0
         for layer in self.trainable_layers:
             # ids of weights and biases are same as the ids of corresponding gradients
+            #! At the moment each subclass of Layer has its own id generator.
+            #! We should either put it in the root class or cobine id number
+            #! with the name of the subclass:
+            #! W_id = f"{layer.__class__.__name__}_dW_{layer.id}"
             W_id, b_id = layer.get_W_and_b_ids()
             #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
             self.m[W_id] = np.zeros_like(layer.weights)
