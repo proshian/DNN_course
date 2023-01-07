@@ -45,19 +45,25 @@ class Bottleneck:
         self.relu1 = ReLULayer()
         self.relu2 = ReLULayer()
         self.relu3 = ReLULayer()
-        self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
 
-    def forward(self, input_: np.ndarray) -> np.ndarray:
-        """
-        Performs a forward pass of the bottleneck.
-        """
+        # conv_to_match_dimensions is created only if it's needed to not waste memory.
         # There are two cases for performing a convolution on identity:
         # 1. There will be downsampling (stride_for_downsampling != 1)
         # 2. The number of bottleneck's output channels is different from the
         #    number of input channels (in_channels != bottleneck_depth * self.expansion)
         # Note that the number of input's channels is equal to the number
-        # of output's channels when it's not the first bottleneck in a block. 
-        if self.in_channels != self.bottleneck_depth * self.expansion or self.stride_for_downsampling != 1:
+        # of output's channels when it's not the first bottleneck in a block.
+        self.conv_to_match_dimensions = None
+        if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
+            self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
+        
+
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        """
+        Performs a forward pass of the bottleneck.
+        """
+        
+        if self.conv_to_match_dimensions:
             identity = self.conv_to_match_dimensions.forward(input_)
         else:
             identity = input_  # ! thought about using np.copy(input_) here but convolutions are not inplace

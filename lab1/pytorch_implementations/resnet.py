@@ -49,23 +49,27 @@ class Bottleneck(nn.Module):
         self.conv2 = conv3x3(bottleneck_depth, bottleneck_depth)
         self.conv3 = conv1x1(bottleneck_depth, bottleneck_depth * self.expansion)
         self.relu = nn.ReLU(inplace=True)
-        self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
-    
-    def forward(self, x: Tensor) -> Tensor:
-        
+
+        # conv_to_match_dimensions is created only if it's needed to not waste memory.
+        # ! However it seems like it doesn't affect the memory usage in pytorch implementation.
         # There are two cases for performing a convolution on identity:
         # 1. There will be downsampling (stride_for_downsampling != 1)
         # 2. The number of bottleneck's output channels is different from the
         #    number of input channels (in_channels != bottleneck_depth * self.expansion)
         # Note that the number of input's channels is equal to the number
         # of output's channels when it's not the first bottleneck in a block. 
-        if self.in_channels != self.bottleneck_depth * self.expansion or self.stride_for_downsampling != 1:
+        self.conv_to_match_dimensions = None
+        if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
+            self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
+        # ! Возможно, стоит вынести проверку на необходимость применения conv_to_match_dimensions
+        # отсюда в ResNet и передавать в Bottleneck параметр need_to_match_dimensions
+    
+    def forward(self, x: Tensor) -> Tensor:
+
+        if self.conv_to_match_dimensions:
             identity = self.conv_to_match_dimensions(x)
         else:
             identity = x
-        # ! Возможно, стоит вынести проверку на необходимость применения conv_to_match_dimensions
-        # отсюда в ResNet и передавать в Bottleneck параметр need_to_match_dimensions
-        # Кажется, ветвление в forward - плохая идея
 
         out = self.conv1(x)
         out = self.relu(out)
