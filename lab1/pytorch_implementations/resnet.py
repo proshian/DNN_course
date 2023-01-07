@@ -4,14 +4,13 @@ import torch  # Used only for flattening
 import torch.nn as nn
 from torch import Tensor  # For typing
 
-__all__ = ['ResNet', 'resnet101', 'Bottleneck'] # ! Bottleneck is temporary here
+__all__ = ['ResNet', 'resnet101', 'Bottleneck']  # ! Bottleneck is temporary here
 
 def conv3x3(in_channels: int, out_channels: int, stride: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding (to reserve feature map size)"""
     return nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=stride, bias=False)
 
 def conv1x1(in_channels: int, out_channels: int, stride: int = 1) -> nn.Conv2d:
-    """3x3 convolution with padding (to reserve feature map size)"""
     return nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False)
 
 class Bottleneck(nn.Module):
@@ -56,8 +55,10 @@ class Bottleneck(nn.Module):
         
         # There are two cases for performing a convolution on identity:
         # 1. There will be downsampling (stride_for_downsampling != 1)
-        # 2. The number of bottleneck's output channels is different from the number of input channels
-        #    (in_channels != bottleneck_depth * self.expansion)
+        # 2. The number of bottleneck's output channels is different from the
+        #    number of input channels (in_channels != bottleneck_depth * self.expansion)
+        # Note that the number of input's channels is equal to the number
+        # of output's channels when it's not the first bottleneck in a block. 
         if self.in_channels != self.bottleneck_depth * self.expansion or self.stride_for_downsampling != 1:
             identity = self.conv_to_match_dimensions(x)
         else:
@@ -104,7 +105,9 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(
             img_channels, self.cur_block_in_channels,
             kernel_size=7, stride=2, padding=3, bias=False)
-        self.conv2_x = self._make_blocks(block_nums[0], 64, True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2_x = self._make_blocks(block_nums[0], 64, False)
         self.conv3_x = self._make_blocks(block_nums[1], 128)
         self.conv4_x = self._make_blocks(block_nums[2], 256)
         self.conv5_x = self._make_blocks(block_nums[3], 512)
@@ -144,6 +147,8 @@ class ResNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.conv1(x)
+        x = self.maxpool(x)
+        x = self.relu(x)
         x = self.conv2_x(x)
         x = self.conv3_x(x)
         x = self.conv4_x(x)

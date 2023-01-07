@@ -12,14 +12,20 @@ class Layer:
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
+class TrainableLayer(Layer):
+    id_iter = itertools.count()
 
-class FullyConnectedLayer(Layer):
+    def __init__(self):
+        # id is used to identify the layer's weights and bias in the optimizer
+        self.id = next(TrainableLayer.id_iter)
+
+class FullyConnectedLayer(TrainableLayer):
     
     id_iter = itertools.count()
 
     def __init__(self, n_input_neurons: int, n_output_neurons: int):
-        # id is used to identify the layer's weights and bias in the optimizer
-        self.id = next(FullyConnectedLayer.id_iter)
+        # ! id was moved to the Layer class
+        super(FullyConnectedLayer, self).__init__()
         self.weights = np.random.randn(n_input_neurons, n_output_neurons) * 0.01
         self.bias = np.random.randn(1, n_output_neurons) * 0.01
 
@@ -48,6 +54,7 @@ class FullyConnectedLayer(Layer):
         self.W_and_b_grad = (self.weights_gradient, self.bias_gradient)
         return input_gradient
     
+    #! Maybe move to super class
     def get_W_and_b_ids(self) -> Tuple[str, str]:
         weights_id = f"dW{self.id}"
         bias_id = f"db{self.id}"
@@ -60,11 +67,12 @@ class FullyConnectedLayer(Layer):
     """
 
 
-class Conv2d(Layer):
+class Conv2d(TrainableLayer):
     id_iter = itertools.count()
 
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
-        self.id = next(Conv2d.id_iter)
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
+                 stride: int = 1, padding: int = 0, bias: bool = True):
+        super(Conv2d, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -116,11 +124,9 @@ class Conv2d(Layer):
         output_gradient is a 4D array with shape (batch_size, out_channels, out_height, out_width)
         """
         batch_size, out_channels, out_height, out_width = output_gradient.shape
-        _, in_channels, height, width = self.input_.shape
+        _, _, height, width = self.input_.shape
         padded_input = self.get_padded_input(self.input_)
-        padded_height = height + 2 * self.padding
-        padded_width = width + 2 * self.padding
-        input_gradient = np.zeros((batch_size, in_channels, padded_height, padded_width))
+        input_gradient = np.zeros_like(padded_input)
         self.weights_gradient = np.zeros(self.weights.shape)
         self.bias_gradient = np.zeros(self.bias.shape)
         # bi stands for batch index
@@ -133,11 +139,6 @@ class Conv2d(Layer):
                         if self.bias is not None:
                             self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
-
-        
-
-    
-
 
 
 class ActivationLayer(Layer):
@@ -242,7 +243,7 @@ class AdamOptimizer(Optimizer):
 
     There's also an ugly option to have an instance of AdamOptimizer for each parameter.
     """
-    def __init__(self, trainable_layers: List[Layer], learning_rate: float = 0.001,
+    def __init__(self, trainable_layers: List[TrainableLayer], learning_rate: float = 0.001,
                  beta1: float = 0.9, beta2: float = 0.999, epsilon: float = 1e-8):
         #!? maybe we should pass paramters and parameters' ids to the optimizer instead of passing layers
         self.trainable_layers = trainable_layers
@@ -255,10 +256,6 @@ class AdamOptimizer(Optimizer):
         self.t = 0
         for layer in self.trainable_layers:
             # ids of weights and biases are same as the ids of corresponding gradients
-            #! At the moment each subclass of Layer has its own id generator.
-            #! We should either put it in the root class or cobine id number
-            #! with the name of the subclass:
-            #! W_id = f"{layer.__class__.__name__}_dW_{layer.id}"
             W_id, b_id = layer.get_W_and_b_ids()
             #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
             self.m[W_id] = np.zeros_like(layer.weights)
