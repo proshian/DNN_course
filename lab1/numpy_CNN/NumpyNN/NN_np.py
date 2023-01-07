@@ -128,7 +128,8 @@ class Conv2d(TrainableLayer):
         padded_input = self.get_padded_input(self.input_)
         input_gradient = np.zeros_like(padded_input)
         self.weights_gradient = np.zeros(self.weights.shape)
-        self.bias_gradient = np.zeros(self.bias.shape)
+        if self.bias is not None:
+            self.bias_gradient = np.zeros(self.bias.shape)
         # bi stands for batch index
         for bi in range(batch_size):
             for oci in range(out_channels):

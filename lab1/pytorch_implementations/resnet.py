@@ -66,7 +66,7 @@ class Bottleneck(nn.Module):
     
     def forward(self, x: Tensor) -> Tensor:
 
-        if self.conv_to_match_dimensions:
+        if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions(x)
         else:
             identity = x

@@ -63,11 +63,13 @@ class Bottleneck:
         Performs a forward pass of the bottleneck.
         """
         
-        if self.conv_to_match_dimensions:
+        if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions.forward(input_)
         else:
-            identity = input_  # ! thought about using np.copy(input_) here but convolutions are not inplace
+            identity = input_
 
+        # The layers from conv1 to conv3 are main path.
+        #! Maybe make them members of a sequential network object?
         out = self.conv1.forward(input_)
         out = self.relu1.forward(out)
 
@@ -85,48 +87,15 @@ class Bottleneck:
         """
         Performs a backward pass of the bottleneck.
         """
-        # the last operation in forward pass is relu
-        # so the first operation in backward pass is relu_backward
-        addition_output_gradient = self.relu.backward(output_gradient)
+        main_path_output_gradient = self.relu3.backward(output_gradient)
+        identity_output_gradient = main_path_output_gradient.copy()
+
+        if self.conv_to_match_dimensions is not None:
+            identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
         
-
-"""
-class Add(Layer):
-    def __init__(self):
-        self.left = None
-        self.right = None
-
-    def forward(self, x: np.array):
-        assert len(x) == 2
-        self.left = x[0]
-        self.right = x[1]
-
-        return self.left + self.right
-
-    def backward(self, d_output: np.array):
-        return np.array([d_output, d_output])
-
-
-class ResidualBlock(Layer):
-    def __init__(self, layers, downsample):
-        super().__init__('ResidualBlock')
-        self.layers = layers
-        self.add_layer = Add()
-        self.downsample = downsample
-
-    def forward(self, x: np.array):
-        self.input = x
-
-        fwd = self.layers(x)
-        return self.add_layer([fwd, self.downsample(self.input)])
-
-    def backward(self, d_output: np.array):
-        dl, dr = self.add_layer.backward(d_output)
-        d_path = self.layers.backward(dl)
-        d_downsample = self.downsample.backward(dr)
-
-        return d_path + d_downsample
-
-    def params(self):
-        return self.layers.params() + self.downsample.params()
-"""
+        # The layers from conv1 to conv3 are main path.
+        #! Maybe make them members of a sequential network object?
+        for layer in ([self.conv3, self.relu2, self.conv2, self.relu1, self.conv1]):
+            main_path_output_gradient = layer.backward(main_path_output_gradient)
+        
+        return main_path_output_gradient + identity_output_gradient      
