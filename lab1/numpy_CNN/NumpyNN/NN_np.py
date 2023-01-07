@@ -140,6 +140,21 @@ class Conv2d(TrainableLayer):
                         if self.bias is not None:
                             self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
+    
+    def get_W_and_b_ids(self) -> Tuple[str, str]:
+        weights_id = f"dW{self.id}"
+        bias_id = f"db{self.id}"
+        return weights_id, bias_id
+
+
+class Flatten(Layer):
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        self.input_shape = input_.shape
+        batch_size = input_.shape[0]
+        return input_.reshape(batch_size, -1)
+    
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        return output_gradient.reshape(self.input_shape)
 
 
 class ActivationLayer(Layer):
@@ -303,8 +318,7 @@ class GradientDescentOptimizer(Optimizer):
             layer.bias -= self.learning_rate * layer.bias_gradient
     
 
-
-class Sequential:
+class SequentialFullyConnected:
     """
     Feed forward neural network stack.
     Attributes:
@@ -325,8 +339,6 @@ class Sequential:
             self.layers.append(fcl)
             self.trainable_layers.append(fcl)
             self.layers.append(activations[i]())
-        
-        
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         for layer in self.layers:
@@ -334,6 +346,23 @@ class Sequential:
         return input_
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        # We omit the last layer because it's an activation function
         for layer in reversed(self.layers[:-1]):
+            output_gradient = layer.backward(output_gradient)
+        return output_gradient
+
+
+class Sequential:
+    def __init__(self, layers: List[Layer]):
+        self.layers = layers
+        self.trainable_layers = [layer for layer in layers if isinstance(layer, TrainableLayer)]
+
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        for layer in self.layers:
+            input_ = layer.forward(input_)
+        return input_
+    
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        for layer in reversed(self.layers):
             output_gradient = layer.backward(output_gradient)
         return output_gradient

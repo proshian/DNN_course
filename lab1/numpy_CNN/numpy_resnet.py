@@ -59,10 +59,6 @@ class Bottleneck:
         
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        """
-        Performs a forward pass of the bottleneck.
-        """
-        
         if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions.forward(input_)
         else:
@@ -84,18 +80,15 @@ class Bottleneck:
         return out
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        """
-        Performs a backward pass of the bottleneck.
-        """
         main_path_output_gradient = self.relu3.backward(output_gradient)
         identity_output_gradient = main_path_output_gradient.copy()
-
-        if self.conv_to_match_dimensions is not None:
-            identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
         
         # The layers from conv1 to conv3 are main path.
         #! Maybe make them members of a sequential network object?
         for layer in ([self.conv3, self.relu2, self.conv2, self.relu1, self.conv1]):
             main_path_output_gradient = layer.backward(main_path_output_gradient)
         
-        return main_path_output_gradient + identity_output_gradient      
+        if self.conv_to_match_dimensions is not None:
+            identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
+        
+        return main_path_output_gradient + identity_output_gradient
