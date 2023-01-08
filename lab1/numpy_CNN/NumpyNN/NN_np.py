@@ -18,6 +18,9 @@ class TrainableLayer(Layer):
     def __init__(self):
         # id is used to identify the layer's weights and bias in the optimizer
         self.id = next(TrainableLayer.id_iter)
+    
+    def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
+        raise NotImplementedError
 
 class FullyConnectedLayer(TrainableLayer):
     
@@ -28,6 +31,8 @@ class FullyConnectedLayer(TrainableLayer):
         super(FullyConnectedLayer, self).__init__()
         self.weights = np.random.randn(n_input_neurons, n_output_neurons) * 0.01
         self.bias = np.random.randn(1, n_output_neurons) * 0.01
+        self.weights_gradient = None
+        self.bias_gradient = None
 
         #! Code below was not used. Was intended to be used in the optimizer
         """
@@ -66,6 +71,10 @@ class FullyConnectedLayer(TrainableLayer):
         self.parameter_by_gradient_id[gradient_id] = gradient
     """
 
+    def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
+        weights_id, bias_id = self.get_W_and_b_ids()
+        return [(self.weights, self.weights_gradient, weights_id), (self.bias, self.bias_gradient, bias_id)]
+
 
 class Conv2d(TrainableLayer):
     id_iter = itertools.count()
@@ -79,6 +88,8 @@ class Conv2d(TrainableLayer):
         self.stride = stride
         self.padding = padding
         self.bias = bias
+        self.weights_gradient = None
+        self.bias_gradient = None
 
         # out_channels is the number of filters and in_channels, kernel_size, kernel_size are the shape of the filter
         self.weights = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * 0.01
@@ -145,6 +156,14 @@ class Conv2d(TrainableLayer):
         weights_id = f"dW{self.id}"
         bias_id = f"db{self.id}"
         return weights_id, bias_id
+    
+    def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
+        parameters_and_gradients_and_ids = []
+        weights_id, bias_id = self.get_W_and_b_ids()
+        parameters_and_gradients_and_ids.append((self.weights, self.weights_gradient, weights_id))
+        if self.bias is not None:
+            parameters_and_gradients_and_ids.append((self.bias, self.bias_gradient, bias_id))
+        return parameters_and_gradients_and_ids
 
 
 class Flatten(Layer):
@@ -271,14 +290,10 @@ class AdamOptimizer(Optimizer):
         self.v = {}
         self.t = 0
         for layer in self.trainable_layers:
-            # ids of weights and biases are same as the ids of corresponding gradients
-            W_id, b_id = layer.get_W_and_b_ids()
-            #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
-            self.m[W_id] = np.zeros_like(layer.weights)
-            self.m[b_id] = np.zeros_like(layer.bias)
-            self.v[W_id] = np.zeros_like(layer.weights)
-            self.v[b_id] = np.zeros_like(layer.bias)
-        
+            for param, _, id in layer.get_parameters_and_gradients_and_ids():
+                #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
+                self.m[id] = np.zeros_like(param)
+                self.v[id] = np.zeros_like(param)
     
     def update(self, gradient: np.ndarray, cache_id: str) -> None:
         self.m[cache_id] = self.beta1 * self.m[cache_id] + (1 - self.beta1) * gradient
@@ -288,22 +303,9 @@ class AdamOptimizer(Optimizer):
         for layer in self.trainable_layers:
             #! Since np arrays are passed by reference the weights and bias
             # layer properties are going to be properly updated.
-            # The loop approach seems to be more general.
-            # On the other hand, the commented code below might be more readable
-            # and it updates the parameters explicitly so we immediately see what's going on.
-
-            """
-            for gradient, cache_id, parameter in zip(layer.W_and_b_grad, layer.get_W_and_b_ids(), (layer.weights, layer.bias)):                
+            for parameter, gradient, cache_id in layer.get_parameters_and_gradients_and_ids():
                 self.update(gradient, cache_id)
                 parameter -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
-            """
-            
-            W_id, b_id = layer.get_W_and_b_ids()
-            self.update(layer.weights_gradient, W_id)
-            layer.weights -= self.learning_rate * self.m[W_id] / (np.sqrt(self.v[W_id]) + self.epsilon)
-            self.update(layer.bias_gradient, b_id)
-            layer.bias -= self.learning_rate * self.m[b_id] / (np.sqrt(self.v[b_id]) + self.epsilon)
-            
         self.t += 1
 
 
@@ -314,8 +316,10 @@ class GradientDescentOptimizer(Optimizer):
 
     def step(self) -> None:
         for layer in self.trainable_layers:
-            layer.weights -= self.learning_rate * layer.weights_gradient
-            layer.bias -= self.learning_rate * layer.bias_gradient
+            #! Since np arrays are passed by reference the weights and bias
+            # layer properties are going to be properly updated.
+            for parameter, gradient, _ in layer.get_parameters_and_gradients_and_ids():
+                parameter -= self.learning_rate * gradient
     
 
 class SequentialFullyConnected:

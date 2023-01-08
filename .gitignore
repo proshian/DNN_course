@@ -130,4 +130,4 @@ ui-tests/playwright-report
 # RTC
 .jupyter_ystore.db
 
-/lab1/pytorch_implementations/weights/*
+/lab1/pytorch_implementations/weights/*.h5
