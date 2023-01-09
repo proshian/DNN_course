@@ -76,12 +76,12 @@ class FullyConnectedLayer(TrainableLayer):
         return [(self.weights, self.weights_gradient, weights_id), (self.bias, self.bias_gradient, bias_id)]
 
 
-class Conv2d(TrainableLayer):
+class Conv2dWithLoops(TrainableLayer):
     id_iter = itertools.count()
 
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
                  stride: int = 1, padding: int = 0, bias: bool = True):
-        super(Conv2d, self).__init__()
+        super(Conv2dWithLoops, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -95,10 +95,11 @@ class Conv2d(TrainableLayer):
         self.weights = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * 0.01
         if self.bias:
             self.bias = np.random.randn(out_channels) * 0.01
+            # ! i think an alternative is np.random.randn(out_channels, 1, 1, 1) * 0.01
         else:
             self.bias = None
     
-    def get_padded_input(self, input_: np.ndarray) -> np.ndarray:
+    def _get_padded_input(self, input_: np.ndarray) -> np.ndarray:
         batch_size, in_channels, height, width = input_.shape
         padded_height = height + 2 * self.padding
         padded_width = width + 2 * self.padding
@@ -113,7 +114,7 @@ class Conv2d(TrainableLayer):
         """
         self.input_ = input_
         batch_size, _, height, width = input_.shape
-        padded_input = self.get_padded_input(input_)
+        padded_input = self._get_padded_input(input_)
         padded_height = height + 2 * self.padding
         padded_width = width + 2 * self.padding
         out_height = (padded_height - self.kernel_size) // self.stride + 1
@@ -136,7 +137,7 @@ class Conv2d(TrainableLayer):
         """
         batch_size, out_channels, out_height, out_width = output_gradient.shape
         _, _, height, width = self.input_.shape
-        padded_input = self.get_padded_input(self.input_)
+        padded_input = self._get_padded_input(self.input_)
         input_gradient = np.zeros_like(padded_input)
         self.weights_gradient = np.zeros(self.weights.shape)
         if self.bias is not None:
@@ -151,6 +152,152 @@ class Conv2d(TrainableLayer):
                         if self.bias is not None:
                             self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
+
+    def get_W_and_b_ids(self) -> Tuple[str, str]:
+        weights_id = f"dW{self.id}"
+        bias_id = f"db{self.id}"
+        return weights_id, bias_id
+    
+    def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
+        parameters_and_gradients_and_ids = []
+        weights_id, bias_id = self.get_W_and_b_ids()
+        parameters_and_gradients_and_ids.append((self.weights, self.weights_gradient, weights_id))
+        if self.bias is not None:
+            parameters_and_gradients_and_ids.append((self.bias, self.bias_gradient, bias_id))
+        return parameters_and_gradients_and_ids
+
+
+
+
+class Conv2d(TrainableLayer):
+    id_iter = itertools.count()
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
+                 stride: int = 1, padding: int = 0, bias: bool = True):
+        super(Conv2d, self).__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.bias = bias
+        self.weights_gradient = None
+        self.bias_gradient = None
+
+        # out_channels is the number of filters and in_channels, kernel_size, kernel_size are the shape of the filter
+        self.weights = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * 0.01
+        if self.bias:
+            self.bias = np.random.randn(out_channels) * 0.01
+        else:
+            self.bias = None
+    
+    def _get_padded_input(self, input_: np.ndarray) -> np.ndarray:
+        batch_size, in_channels, height, width = input_.shape
+        padded_height = height + 2 * self.padding
+        padded_width = width + 2 * self.padding
+        padded_input = np.zeros((batch_size, in_channels, padded_height, padded_width))
+        padded_input[:, :, self.padding:self.padding+height, self.padding:self.padding+width] = input_
+        return padded_input
+    
+    # ! Check
+    @staticmethod
+    def _convert_bias(bias):
+        return bias.reshape(-1, 1)
+
+    @staticmethod
+    def _convert_weights(weights):
+        # We need to convert weights to a 2d matrix where rows are separate
+        # flattened filters of initial weights tensor
+        # ! not sure if I do it inplace.
+        # ! If I will implement the convolution with matrix multiplication
+        # ! I think I should initialize weights as a 2d matrix insted of
+        # ! a 4d tensor and never call this method
+
+        # ! This method will only be called to compare two convolution
+        # ! implementations. Specifically to initialize the weights
+        # ! with the same values as torch implementation and
+        # ! implementation with loops 
+
+        # ! Those for loops are better then naive implementation since the 
+        # ! conversion is performed a single time while the matrix
+        # ! multiplication is performed on every step of training 
+        flattened_filters = []
+        for filter in weights:
+            flattened_filters.append(filter.reshape(1, -1))
+        coverted_weights = np.concatenate(flattened_filters, axis = 0)
+        return coverted_weights
+    
+    def _convert_input(self, input_, output_height, output_width):
+        converted_input = None
+
+        # I will call feature maps images
+        # The columns of a converted image are concatenated horizontally
+        # The separate images are concatenated horizontally too.
+        # Thus we will append all columns of all images in one list
+        # that will be concatenated in the end
+        image_lines = []
+        for image in input_:
+            # the indexes are as if we walk through the output tensor in "regular" conv implementation
+            for r in range(output_height):
+                for c in range(output_width):
+                    image_lines.append(
+                        image[:, r*self.stride:r*self.stride+self.kernel_size, c*self.stride:c*self.stride+self.kernel_size].reshape(-1, 1))
+        converted_input = np.concatenate(image_lines, axis = 1)
+        
+        # ! Below is a test that checks if converted_input has a proper shape 
+        # print("converted_input.shape = ", converted_input.shape)
+        # expected_shape = (input_.shape[1] * self.kernel_size * self.kernel_size, input_.shape[0] * output_height * output_width)
+        # print(expected_shape)
+        # print(converted_input.shape == expected_shape)
+
+        return converted_input
+
+    
+
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        # Used this explanation https://stepik.org/lesson/309343/step/7?unit=291492
+        self.input_ = input_
+        batch_size, _, height, width = input_.shape
+        padded_input = self._get_padded_input(input_)
+        padded_height = height + 2 * self.padding
+        padded_width = width + 2 * self.padding
+        out_height = (padded_height - self.kernel_size) // self.stride + 1
+        out_width = (padded_width - self.kernel_size) // self.stride + 1
+
+        converted_weights = self._convert_weights(self.weights)
+        if self.bias is not None:
+            converted_bias = self._convert_bias(self.bias)
+        converted_input = self._convert_input(padded_input, out_height, out_width)
+
+        conv2d_out = converted_weights @ converted_input
+        if self.bias is not None:
+            conv2d_out += converted_bias
+        # print("conv2d_out.shape = ", conv2d_out.shape)
+        return conv2d_out.reshape(self.out_channels, batch_size, out_height, out_width).transpose(1, 0, 2, 3)
+    
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        """
+        output_gradient is a 4D array with shape (batch_size, out_channels, out_height, out_width)
+        """
+        batch_size, out_channels, out_height, out_width = output_gradient.shape
+        _, _, height, width = self.input_.shape
+        padded_input = self._get_padded_input(self.input_)
+        input_gradient = np.zeros_like(padded_input)
+        self.weights_gradient = np.zeros(self.weights.shape)
+        if self.bias is not None:
+            self.bias_gradient = np.zeros(self.bias.shape)
+        # bi stands for batch index
+        for bi in range(batch_size):
+            for oci in range(out_channels):
+                for h in range(out_height):
+                    for w in range(out_width):
+                        input_gradient[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] += self.weights[oci] * output_gradient[bi, oci, h, w]
+                        self.weights_gradient[oci] += padded_input[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] * output_gradient[bi, oci, h, w]
+                        if self.bias is not None:
+                            self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
+        return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
+
+        
     
     def get_W_and_b_ids(self) -> Tuple[str, str]:
         weights_id = f"dW{self.id}"
@@ -350,7 +497,7 @@ class SequentialFullyConnected:
         return input_
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        # We omit the last layer because it's an activation function
+        # ! I don't see any reason to omit the last layer. Have to check it.
         for layer in reversed(self.layers[:-1]):
             output_gradient = layer.backward(output_gradient)
         return output_gradient

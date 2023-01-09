@@ -1,0 +1,29 @@
+my_resnet101_06_01_2023_without_batch_norm_96x96_black_and_whiten__epoch_28.h5
+Epoch 1/1
+----------
+100%|██████████| 21/21 [01:40<00:00,  4.77s/it]
+val loss: 4.2854, f_score: 0.1057, accuracy: 0.11752269618206691
+
+my_resnet101_06_01_2023_without_batch_norm_96x96_black_and_whiten__epoch_32.h5
+Epoch 1/1
+----------
+100%|██████████| 21/21 [01:40<00:00,  4.76s/it]
+val loss: 4.4711, f_score: 0.1125, accuracy: 0.12423827882104216
+
+my_resnet101_06_01_2023_without_batch_norm_96x96_black_and_whiten__epoch_36.h5
+Epoch 1/1
+----------
+100%|██████████| 21/21 [01:39<00:00,  4.76s/it]
+val loss: 4.5148, f_score: 0.1508, accuracy: 0.15134933465986816
+
+my_resnet101_06_01_2023_without_batch_norm_96x96_black_and_whiten__epoch_40.h5
+Epoch 1/1
+----------
+100%|██████████| 21/21 [01:40<00:00,  4.78s/it]
+val loss: 4.7922, f_score: 0.1523, accuracy: 0.1544584006964308
+
+my_resnet101_06_01_2023_without_batch_norm_96x96_black_and_whiten__epoch_44.h5
+Epoch 1/1
+----------
+100%|██████████| 21/21 [01:40<00:00,  4.78s/it]
+val loss: 4.8695, f_score: 0.1680, accuracy: 0.16913319238900634
