@@ -147,8 +147,19 @@ class Conv2dWithLoops(TrainableLayer):
             for oci in range(out_channels):
                 for h in range(out_height):
                     for w in range(out_width):
-                        input_gradient[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] += self.weights[oci] * output_gradient[bi, oci, h, w]
-                        self.weights_gradient[oci] += padded_input[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] * output_gradient[bi, oci, h, w]
+                        # h_start is row position of the first element of the kernel
+                        h_start = h*self.stride 
+                        # h_end is row position of the last element of the kernel
+                        h_end = h*self.stride+self.kernel_size
+                        # w_start is column position of the first element of the kernel
+                        w_start = w*self.stride
+                        # w_end is column position of the last element of the kernel
+                        w_end = w*self.stride+self.kernel_size
+                        input_gradient[bi, :, h_start:h_end, w_start:w_end] += (
+                            self.weights[oci] * output_gradient[bi, oci, h, w])
+                        self.weights_gradient[oci] += (
+                            padded_input[bi, :, h_start:h_end, w_start:w_end] *
+                            output_gradient[bi, oci, h, w])
                         if self.bias is not None:
                             self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
@@ -199,7 +210,9 @@ class Conv2d(TrainableLayer):
         padded_input[:, :, self.padding:self.padding+height, self.padding:self.padding+width] = input_
         return padded_input
     
-    # ! Check
+    # ! May be it would be a nice idea to make the conversion to "regular"
+    # shape and make a getter. So that users won't be scared :)
+
     @staticmethod
     def _convert_bias(bias):
         return bias.reshape(-1, 1)
@@ -291,8 +304,19 @@ class Conv2d(TrainableLayer):
             for oci in range(out_channels):
                 for h in range(out_height):
                     for w in range(out_width):
-                        input_gradient[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] += self.weights[oci] * output_gradient[bi, oci, h, w]
-                        self.weights_gradient[oci] += padded_input[bi, :, h*self.stride:h*self.stride+self.kernel_size, w*self.stride:w*self.stride+self.kernel_size] * output_gradient[bi, oci, h, w]
+                        # h_start is row position of the first element of the kernel
+                        h_start = h*self.stride 
+                        # h_end is row position of the last element of the kernel
+                        h_end = h*self.stride+self.kernel_size
+                        # w_start is column position of the first element of the kernel
+                        w_start = w*self.stride
+                        # w_end is column position of the last element of the kernel
+                        w_end = w*self.stride+self.kernel_size
+                        input_gradient[bi, :, h_start:h_end, w_start:w_end] += (
+                            self.weights[oci] * output_gradient[bi, oci, h, w])
+                        self.weights_gradient[oci] += (
+                            padded_input[bi, :, h_start:h_end, w_start:w_end] *
+                            output_gradient[bi, oci, h, w])
                         if self.bias is not None:
                             self.bias_gradient[oci] += output_gradient[bi, oci, h, w]
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
