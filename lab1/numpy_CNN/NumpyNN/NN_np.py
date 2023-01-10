@@ -1,7 +1,4 @@
-try:
-    import cupy as np
-except ImportError:
-    import numpy as np
+import numpy as np
 import itertools
 from typing import List, Tuple
 
@@ -319,8 +316,8 @@ class Conv2d(TrainableLayer):
     def backward_as_matrix_multiplication(self, output_gradient: np.ndarray) -> np.ndarray:
         self.compute_weights_grad_and_bias_grad_matrix_mul(output_gradient)
 
-        output_gradient_converted = self._convert_output_gradient(output_gradient)
-        
+        # output_gradient_converted = self._convert_output_gradient(output_gradient)
+        output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
         batch_size, n_input_channels, input_h, input_w = self.input_.shape
         padded_input_shape = (batch_size, n_input_channels,
             input_h + 2 * self.padding, input_w + 2 * self.padding)
@@ -391,6 +388,55 @@ class Conv2d(TrainableLayer):
             parameters_and_gradients_and_ids.append((self.bias, self.bias_gradient, bias_id))
         return parameters_and_gradients_and_ids
 
+class MaxPool2d(Layer):
+    # ! May be use inheritance or a global function to perform padding
+    def __init__(self, kernel_size: int, stride: int, padding: int = 0):
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+    
+    def _get_padded_input(self, input_: np.ndarray) -> np.ndarray:
+        batch_size, n_channels, height, width = input_.shape
+        padded_input = np.zeros((batch_size, n_channels, height + 2*self.padding, width + 2*self.padding))
+        padded_input[:, :, self.padding:self.padding+height, self.padding:self.padding+width] = input_
+        return padded_input
+
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        self.input_ = input_
+        padded_input = self._get_padded_input(input_)
+        batch_size, n_channels, height, width = padded_input.shape
+        out_height = (height - self.kernel_size) // self.stride + 1
+        out_width = (width - self.kernel_size) // self.stride + 1
+        output = np.zeros((batch_size, n_channels, out_height, out_width))
+        for bi in range(batch_size):
+            for oci in range(n_channels):
+                for h in range(out_height):
+                    for w in range(out_width):
+                        h_start = h*self.stride
+                        h_end = h*self.stride+self.kernel_size
+                        w_start = w*self.stride
+                        w_end = w*self.stride+self.kernel_size
+                        output[bi, oci, h, w] = np.max(input_[bi, oci, h_start:h_end, w_start:w_end])
+        return output
+    
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        input_gradient = np.zeros_like(self.input_)
+        padded_input = self._get_padded_input(self.input_)
+        batch_size, n_channels, height, width = padded_input.shape
+        out_height = (height - self.kernel_size) // self.stride + 1
+        out_width = (width - self.kernel_size) // self.stride + 1
+        for bi in range(batch_size):
+            for oci in range(n_channels):
+                for h in range(out_height):
+                    for w in range(out_width):
+                        h_start = h*self.stride
+                        h_end = h*self.stride+self.kernel_size
+                        w_start = w*self.stride
+                        w_end = w*self.stride+self.kernel_size
+                        max_value = np.max(padded_input[bi, oci, h_start:h_end, w_start:w_end])
+                        input_gradient[bi, oci, h_start:h_end, w_start:w_end] += (
+                            (padded_input[bi, oci, h_start:h_end, w_start:w_end] == max_value) * output_gradient[bi, oci, h, w])
+        return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
 
 class Flatten(Layer):
     def forward(self, input_: np.ndarray) -> np.ndarray:

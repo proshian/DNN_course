@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 from NumpyNN.NN_np import (
     Conv2d,
@@ -57,6 +59,10 @@ class Bottleneck:
         if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
             self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
         
+        self.trainable_layers = [self.conv1, self.conv2, self.conv3]
+        if self.conv_to_match_dimensions is not None:
+            self.trainable_layers.append(self.conv_to_match_dimensions)
+        
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
         if self.conv_to_match_dimensions is not None:
@@ -92,3 +98,57 @@ class Bottleneck:
             identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
         
         return main_path_output_gradient + identity_output_gradient
+    
+
+class ResNet:
+    """
+    ResNet model.
+
+    Attributes:
+        block: Building block type. Currently Bottleneck only.
+        block_nums: Number of blocks for each block configuration.
+            For example for ResNet-50, n_blocks = [3, 4, 6, 3].
+        n_classes (int): Number of classes.
+        img_channels (int): Number of channels in the input image.
+    """
+
+    def __init__(
+        self,
+        # ! In the future Basic Residual Block may be included as a possible type
+        block: Bottleneck,
+        block_nums: List[int],
+        n_classes: int,
+        img_channels: int = 3,
+    ) -> None:
+        pass
+
+    def _make_blocks(
+        self,
+        n_blocks: int,
+        bottleneck_depth: int,
+        downsampling: bool = True
+    ):
+        """
+        Creates a sequence of blocks for a specific stage of ResNet.
+        Args:
+            n_blocks (int): Number of blocks in the stage.
+            first_block_in_channels (int): Number of input channels for the first block.
+            downsampling (bool): Whether to downsample the feature map.
+                If True, the feature map is downsampled by a factor of 2
+                in the first convolution of the first block. downsampling is
+                supposed to be True for conv3_x, conv4_x, conv5_x, and False
+                for conv2_x.
+        Returns:
+            nn.Sequential: A sequence of blocks. For example
+                all blocks of conv_1_x.
+        """
+        
+        blocks = []
+        stride_for_downsampling = 2 if downsampling else 1
+        block = Bottleneck(self.cur_block_in_channels, bottleneck_depth, stride_for_downsampling)
+        self.cur_block_in_channels = bottleneck_depth * block.expansion
+        blocks.append(block)
+        for i in range(1, n_blocks):
+            block = Bottleneck(self.cur_block_in_channels, bottleneck_depth)
+            blocks.append(block)
+        raise Exception("Not implemented yet. Here should be a return of a sequential network (or a list of blocks)")
