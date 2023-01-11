@@ -23,24 +23,14 @@ class TrainableLayer(Layer):
         raise NotImplementedError
 
 class FullyConnectedLayer(TrainableLayer):
-    
-    id_iter = itertools.count()
-
     def __init__(self, n_input_neurons: int, n_output_neurons: int):
         # ! id was moved to the Layer class
         super(FullyConnectedLayer, self).__init__()
-        self.weights = np.random.randn(n_input_neurons, n_output_neurons) * 0.01
-        self.bias = np.random.randn(1, n_output_neurons) * 0.01
-        self.weights_gradient = None
-        self.bias_gradient = None
-
-        #! Code below was not used. Was intended to be used in the optimizer
-        """
-        self.parameter_by_gradient_id = {
-            f"dW{self.id}": self.weights,
-            f"db{self.id}": self.bias
-        }
-        """
+        dtype = 'float32'
+        self.weights = np.random.randn(n_input_neurons, n_output_neurons).astype(dtype, order = 'C') * 0.01
+        self.bias = np.random.randn(1, n_output_neurons).astype(dtype, order = 'C') * 0.01
+        self.weights_gradient = np.zeros_like(self.weights, dtype=dtype, order='C')
+        self.bias_gradient = np.zeros_like(self.bias, dtype=dtype, order='C')
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         """
@@ -53,9 +43,18 @@ class FullyConnectedLayer(TrainableLayer):
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         # The math explanation: https://web.eecs.umich.edu/~justincj/teaching/eecs442/notes/linear-backprop.html
+        # input_gradient = np.dot(output_gradient, self.weights.T)
+        # try:
+        #     np.dot(self.input_.T, output_gradient, out=self.weights_gradient)
+        # except:
+        #     self.weights_gradient[:] = np.dot(self.input_.T, output_gradient)
+        # try:
+        #     np.sum(output_gradient, axis=0, keepdims=True, out=self.bias_gradient)
+        # except:
+        #     self.bias_gradient[:] = np.sum(output_gradient, axis=0, keepdims=True)
         input_gradient = np.dot(output_gradient, self.weights.T)
-        self.weights_gradient = np.dot(self.input_.T, output_gradient)
-        self.bias_gradient = np.sum(output_gradient, axis=0, keepdims=True)
+        self.weights_gradient[:] = np.dot(self.input_.T, output_gradient)
+        self.bias_gradient[:] = np.sum(output_gradient, axis=0, keepdims=True)
         return input_gradient
     
     #! Maybe move to super class
@@ -63,12 +62,6 @@ class FullyConnectedLayer(TrainableLayer):
         weights_id = f"dW{self.id}"
         bias_id = f"db{self.id}"
         return weights_id, bias_id
-    
-    #! Code below was not used. Was intended to be used in the optimizer
-    """
-    def update_parameter_by_gradient_id(self, gradient_id: str, gradient: np.ndarray):
-        self.parameter_by_gradient_id[gradient_id] = gradient
-    """
 
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
         weights_id, bias_id = self.get_W_and_b_ids()
@@ -76,8 +69,6 @@ class FullyConnectedLayer(TrainableLayer):
 
 
 class Conv2dWithLoops(TrainableLayer):
-    id_iter = itertools.count()
-
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
                  stride: int = 1, padding: int = 0, bias: bool = True):
         super(Conv2dWithLoops, self).__init__()
@@ -180,8 +171,6 @@ class Conv2dWithLoops(TrainableLayer):
 
 
 class Conv2d(TrainableLayer):
-    id_iter = itertools.count()
-
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
                  stride: int = 1, padding: int = 0, bias: bool = True):
         super(Conv2d, self).__init__()
@@ -191,13 +180,14 @@ class Conv2d(TrainableLayer):
         self.stride = stride
         self.padding = padding
         self.bias = bias
-        self.weights_gradient = None
-        self.bias_gradient = None
 
-        # out_channels is the number of filters and in_channels, kernel_size, kernel_size are the shape of the filter
-        self.weights = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * 0.01
+        dtype = 'float32'
+        # out_channels is the number of filters and in_channels, kernel_size, kernel_size are the shape of a filter
+        self.weights = np.random.randn(out_channels, in_channels, kernel_size, kernel_size).astype(dtype) * 0.01
+        self.weights_gradient = np.zeros_like(self.weights, dtype=dtype, order='C')
         if self.bias:
-            self.bias = np.random.randn(out_channels) * 0.01
+            self.bias = np.random.randn(out_channels, 1, 1, 1).astype(dtype) * 0.01
+            self.bias_gradient = np.zeros_like(self.bias, dtype=dtype, order='C')
         else:
             self.bias = None
     
@@ -287,7 +277,7 @@ class Conv2d(TrainableLayer):
         return padded_input
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        # Used this explanation https://stepik.org/lesson/309343/step/7?unit=291492
+        # Explanation: https://stepik.org/lesson/309343/step/7?unit=291492
         self.input_ = input_
         batch_size, _, height, width = input_.shape
         padded_input = self._get_padded_input(input_)
@@ -365,14 +355,29 @@ class Conv2d(TrainableLayer):
     def compute_weights_grad_and_bias_grad_matrix_mul(self, output_gradient: np.ndarray) -> None:
         output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
         # print("output_gradient_converted.shape = ", output_gradient_converted.shape)
-        self.weights_gradient = output_gradient_converted @ self.converted_input.T
-        self.weights_gradient = self.weights_gradient.reshape(self.weights.shape)
+
+        # ! Planned to use out parameter in np.dot, but need to perform
+        # reshape on weights_gradient, whicj is not inplace afai
+        self.weights_gradient[:] = np.dot(output_gradient_converted, self.converted_input.T).reshape(self.weights.shape)
 
         if self.bias is not None:
-            self.bias_gradient = output_gradient_converted.sum(axis = 1).reshape(self.bias.shape)
+            self.bias_gradient[:] = output_gradient_converted.sum(axis = 1).reshape(self.bias.shape)
 
     def semi_matrix_backward(self, output_gradient: np.ndarray) -> np.ndarray:
         self.compute_weights_grad_and_bias_grad_matrix_mul(output_gradient)
+        return self.get_input_gradient_only_with_loops(output_gradient)
+    
+    def semi_matrix_backward_not_inplace(self, output_gradient: np.ndarray) -> np.ndarray:
+        output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
+        # print("output_gradient_converted.shape = ", output_gradient_converted.shape)
+
+        # ! Planned to use out parameter in np.dot, but need to perform
+        # reshape on weights_gradient, which is not inplace
+        self.weights_gradient = np.dot(output_gradient_converted, self.converted_input.T).reshape(self.weights.shape)
+
+        if self.bias is not None:
+            self.bias_gradient = output_gradient_converted.sum(axis = 1).reshape(self.bias.shape)
+        
         return self.get_input_gradient_only_with_loops(output_gradient)
     
     def get_W_and_b_ids(self) -> Tuple[str, str]:
@@ -528,7 +533,7 @@ class CrossEntropyLossWithSoftMax:
     
     def backward(self) -> np.ndarray:
         batch_size = self.pred.shape[0]
-        return (self.pred - self.target) / batch_size
+        return ((self.pred - self.target) / batch_size).astype(np.float32)
 
 
 class Optimizer:
@@ -578,6 +583,44 @@ class AdamOptimizer(Optimizer):
             for parameter, gradient, cache_id in layer.get_parameters_and_gradients_and_ids():
                 self.update(gradient, cache_id)
                 parameter -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
+        self.t += 1
+
+
+class AdamOptimizerThatTakesParameters(Optimizer):
+    """
+    I store m and v values for each weight gradient and bias gradient
+    in dictionaries m and v where the key is the id of the parameter matrix
+    which has the form "dW{layer_id}" or "db{layer_id}". Thus, the parameter
+    matrix ids serve as gradient matrix ids.
+    
+    This solution works but I'm not sure that this approach could be used in a graph based computation. 
+
+    There's also an ugly option to have an instance of AdamOptimizer for each parameter.
+    """
+    def __init__(self, params_and_grads: List[Tuple[np.ndarray, np.ndarray]], learning_rate: float = 0.001,
+                 beta1: float = 0.9, beta2: float = 0.999, epsilon: float = 1e-8):
+        #!? maybe we should pass paramters and parameters' ids to the optimizer instead of passing layers
+        self.params_and_grads = params_and_grads
+        self.learning_rate = learning_rate
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        self.m = {}
+        self.v = {}
+        self.t = 0
+        for _, grad in enumerate(params_and_grads):
+            #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
+            self.m[id] = np.zeros_like(grad)
+            self.v[id] = np.zeros_like(grad)
+    
+    def update(self, gradient: np.ndarray, cache_id: str) -> None:
+        self.m[cache_id] = self.beta1 * self.m[cache_id] + (1 - self.beta1) * gradient
+        self.v[cache_id] = self.beta2 * self.v[cache_id] + (1 - self.beta2) * gradient ** 2
+        
+    def step(self) -> None:
+        for cache_id, param, grad in enumerate(self.params_and_grads):
+                self.update(grad, cache_id)
+                param -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
         self.t += 1
 
 
