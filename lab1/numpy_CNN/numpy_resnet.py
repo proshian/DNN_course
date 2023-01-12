@@ -2,8 +2,14 @@ from typing import List
 
 import numpy as np
 from NumpyNN.NN_np import (
+    # Conv2dWithLoops as Conv2d,
     Conv2d,
     ReLULayer,
+    Sequential,
+    MaxPool2d,
+    FullyConnectedLayer,
+    TrainableLayer,
+    Flatten,
 )
 
 
@@ -64,7 +70,12 @@ class Bottleneck:
             self.trainable_layers.append(self.conv_to_match_dimensions)
         
 
+        self.trainable_layers = [self.conv1, self.conv2, self.conv3]
+        
+
     def forward(self, input_: np.ndarray) -> np.ndarray:
+        self.input_ = input_
+        
         if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions.forward(input_)
         else:
@@ -98,6 +109,9 @@ class Bottleneck:
             identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
         
         return main_path_output_gradient + identity_output_gradient
+
+    def get_trainable_layers(self) -> List[TrainableLayer]:
+        return self.trainable_layers
     
 
 class ResNet:
@@ -120,7 +134,33 @@ class ResNet:
         n_classes: int,
         img_channels: int = 3,
     ) -> None:
-        pass
+        self.cur_block_in_channels = 64
+        self.conv1 = Conv2d(
+            img_channels, self.cur_block_in_channels,
+            kernel_size=7, stride=2, padding=3, bias=False)
+        self.maxpool = MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.relu = ReLULayer()
+        self.conv2_x = self._make_blocks(block_nums[0], 64, False)
+        self.conv3_x = self._make_blocks(block_nums[1], 128)
+        self.conv4_x = self._make_blocks(block_nums[2], 256)
+        self.conv5_x = self._make_blocks(block_nums[3], 512)
+        # ! add adaptive avg pool
+        # ! Maybe add reshape
+        self.fc = FullyConnectedLayer(512 * block.expansion, n_classes)
+
+
+        nn_modules = [
+            self.conv1, self.conv2_x, self.conv3_x,
+            self.conv4_x, self.conv5_x, self.fc
+        ]
+
+        self.trainable_layers = []
+        for module in nn_modules:
+            self.trainable_layers.extend(module.get_trainable_layers())
+        
+    def get_trainable_layers(self) -> List[TrainableLayer]:
+        return self.trainable_layers
+
 
     def _make_blocks(
         self,
@@ -148,7 +188,36 @@ class ResNet:
         block = Bottleneck(self.cur_block_in_channels, bottleneck_depth, stride_for_downsampling)
         self.cur_block_in_channels = bottleneck_depth * block.expansion
         blocks.append(block)
-        for i in range(1, n_blocks):
+        for _ in range(1, n_blocks):
             block = Bottleneck(self.cur_block_in_channels, bottleneck_depth)
             blocks.append(block)
-        raise Exception("Not implemented yet. Here should be a return of a sequential network (or a list of blocks)")
+        return Sequential(blocks)
+    
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        out = self.conv1.forward(input_)
+        out = self.maxpool.forward(out)
+        out = self.relu.forward(out)
+        out = self.conv2_x.forward(out)
+        out = self.conv3_x.forward(out)
+        out = self.conv4_x.forward(out)
+        out = self.conv5_x.forward(out)
+        out = out.reshape(out.shape[0], -1) # ! temporary solution 
+        out = self.fc.forward(out)
+        return out
+    
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        out = self.fc.backward(output_gradient)
+        # ! Temporary solution. 2048 = number of channels after
+        # last block of conv5_3 = 512 * block.expansion
+        out = out.reshape(out.shape[0], 2048, 1, 1)
+        out = self.conv5_x.backward(out)
+        out = self.conv4_x.backward(out)
+        out = self.conv3_x.backward(out)
+        out = self.conv2_x.backward(out)
+        out = self.relu.backward(out)
+        out = self.maxpool.backward(out)
+        out = self.conv1.backward(out)
+        return out
+
+def resnet101(n_classes: int, img_channels: int = 3) -> ResNet:
+    return ResNet(Bottleneck, [3, 4, 23, 3], n_classes, img_channels)

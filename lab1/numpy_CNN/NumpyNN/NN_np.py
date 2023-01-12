@@ -11,6 +11,9 @@ class Layer:
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         raise NotImplementedError
+    
+    def get_trainable_layers(self) -> List['TrainableLayer']:
+        return []
 
 class TrainableLayer(Layer):
     id_iter = itertools.count()
@@ -21,6 +24,9 @@ class TrainableLayer(Layer):
     
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
         raise NotImplementedError
+    
+    def get_trainable_layers(self) -> List['TrainableLayer']:
+        return [self]
 
 class FullyConnectedLayer(TrainableLayer):
     
@@ -33,14 +39,6 @@ class FullyConnectedLayer(TrainableLayer):
         self.bias = np.random.randn(1, n_output_neurons) * 0.01
         self.weights_gradient = None
         self.bias_gradient = None
-
-        #! Code below was not used. Was intended to be used in the optimizer
-        """
-        self.parameter_by_gradient_id = {
-            f"dW{self.id}": self.weights,
-            f"db{self.id}": self.bias
-        }
-        """
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         """
@@ -63,12 +61,6 @@ class FullyConnectedLayer(TrainableLayer):
         weights_id = f"dW{self.id}"
         bias_id = f"db{self.id}"
         return weights_id, bias_id
-    
-    #! Code below was not used. Was intended to be used in the optimizer
-    """
-    def update_parameter_by_gradient_id(self, gradient_id: str, gradient: np.ndarray):
-        self.parameter_by_gradient_id[gradient_id] = gradient
-    """
 
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
         weights_id, bias_id = self.get_W_and_b_ids()
@@ -175,7 +167,6 @@ class Conv2dWithLoops(TrainableLayer):
         if self.bias is not None:
             parameters_and_gradients_and_ids.append((self.bias, self.bias_gradient, bias_id))
         return parameters_and_gradients_and_ids
-
 
 
 
@@ -312,6 +303,34 @@ class Conv2d(TrainableLayer):
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         return self.semi_matrix_backward(output_gradient)
 
+    def backward_as_mat_mul_unified(self, output_gradient: np.ndarray) -> np.ndarray:
+        """
+        same as matrix multiplication but without other calls
+        """
+        # output_gradient_converted = self._convert_output_gradient(output_gradient)
+        output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
+        # print("output_gradient_converted.shape = ", output_gradient_converted.shape)
+        self.weights_gradient = output_gradient_converted @ self.converted_input.T
+        self.weights_gradient = self.weights_gradient.reshape(self.weights.shape)
+
+        if self.bias is not None:
+            self.bias_gradient = output_gradient_converted.sum(axis = 1).reshape(self.bias.shape)
+
+
+        batch_size, n_input_channels, input_h, input_w = self.input_.shape
+        padded_input_shape = (batch_size, n_input_channels,
+            input_h + 2 * self.padding, input_w + 2 * self.padding)
+
+        converted_weights = self._convert_weights(self.weights)
+
+        input_gradient = converted_weights.T @ output_gradient_converted
+
+        self.input_gradient_before_restoration = input_gradient
+
+        input_gradient = self._restore_input(input_gradient, padded_input_shape)
+
+        return input_gradient[:, :, self.padding:self.padding+input_h, self.padding:self.padding+input_w]
+
 
     def backward_as_matrix_multiplication(self, output_gradient: np.ndarray) -> np.ndarray:
         self.compute_weights_grad_and_bias_grad_matrix_mul(output_gradient)
@@ -416,15 +435,15 @@ class MaxPool2d(Layer):
                         h_end = h*self.stride+self.kernel_size
                         w_start = w*self.stride
                         w_end = w*self.stride+self.kernel_size
-                        output[bi, oci, h, w] = np.max(input_[bi, oci, h_start:h_end, w_start:w_end])
+                        output[bi, oci, h, w] = np.max(padded_input[bi, oci, h_start:h_end, w_start:w_end])
         return output
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        input_gradient = np.zeros_like(self.input_)
         padded_input = self._get_padded_input(self.input_)
-        batch_size, n_channels, height, width = padded_input.shape
-        out_height = (height - self.kernel_size) // self.stride + 1
-        out_width = (width - self.kernel_size) // self.stride + 1
+        batch_size, n_channels,height, width = self.input_.shape
+        out_height = (height + 2*self.padding - self.kernel_size) // self.stride + 1
+        out_width = (width + 2*self.padding - self.kernel_size) // self.stride + 1
+        input_gradient = np.zeros_like(padded_input)
         for bi in range(batch_size):
             for oci in range(n_channels):
                 for h in range(out_height):
@@ -433,9 +452,11 @@ class MaxPool2d(Layer):
                         h_end = h*self.stride+self.kernel_size
                         w_start = w*self.stride
                         w_end = w*self.stride+self.kernel_size
-                        max_value = np.max(padded_input[bi, oci, h_start:h_end, w_start:w_end])
-                        input_gradient[bi, oci, h_start:h_end, w_start:w_end] += (
-                            (padded_input[bi, oci, h_start:h_end, w_start:w_end] == max_value) * output_gradient[bi, oci, h, w])
+                        window = padded_input[bi, oci, h_start:h_end, w_start:w_end]
+                        max_value = np.max(window)
+                        mask = (window == max_value)
+                        input_gradient[bi, oci, h_start:h_end, w_start:w_end] += mask * output_gradient[bi, oci, h, w]
+                        
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
 
 class Flatten(Layer):
@@ -629,16 +650,23 @@ class SequentialFullyConnected:
 
 
 class Sequential:
-    def __init__(self, layers: List[Layer]):
-        self.layers = layers
-        self.trainable_layers = [layer for layer in layers if isinstance(layer, TrainableLayer)]
+    def __init__(self, nn_modules: List):
+        self.trainable_layers = []
+        self.nn_modules = nn_modules
+
+        self.trainable_layers = []
+        for nn_module in self.nn_modules:
+            self.trainable_layers.extend(nn_module.get_trainable_layers())
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        for layer in self.layers:
-            input_ = layer.forward(input_)
+        for nn_module in self.nn_modules:
+            input_ = nn_module.forward(input_)
         return input_
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        for layer in reversed(self.layers):
-            output_gradient = layer.backward(output_gradient)
+        for nn_module in reversed(self.nn_modules):
+            output_gradient = nn_module.backward(output_gradient)
         return output_gradient
+    
+    def get_trainable_layers(self) -> List[TrainableLayer]:
+        return self.trainable_layers

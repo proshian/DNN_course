@@ -4,6 +4,9 @@ import torch  # Used only for flattening
 import torch.nn as nn
 from torch import Tensor  # For typing
 
+torch.use_deterministic_algorithms(True)
+
+
 __all__ = ['ResNet', 'resnet101', 'Bottleneck']  # ! Bottleneck is temporary here
 
 def conv3x3(in_channels: int, out_channels: int, stride: int = 1) -> nn.Conv2d:
