@@ -4,7 +4,7 @@ import torch  # Used only for flattening
 import torch.nn as nn
 from torch import Tensor  # For typing
 
-torch.use_deterministic_algorithms(True)
+# torch.use_deterministic_algorithms(True)
 
 
 __all__ = ['ResNet', 'resnet101', 'Bottleneck']  # ! Bottleneck is temporary here
