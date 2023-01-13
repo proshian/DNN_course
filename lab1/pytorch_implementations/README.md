@@ -1,4 +1,5 @@
 resnet.py — релизация resnet-101 на pytorch
+
 resnet-adam-vs-adabound.ipynb — сравнение обучения имлементации из resnet.py с Adam и c AdaBound
 
 # Напоминание о делталях архитектуры ResNet
