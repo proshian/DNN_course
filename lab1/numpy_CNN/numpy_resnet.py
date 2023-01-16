@@ -201,7 +201,7 @@ class ResNet:
         out = self.conv3_x.forward(out)
         out = self.conv4_x.forward(out)
         out = self.conv5_x.forward(out)
-        out = out.reshape(out.shape[0], -1) # ! temporary solution 
+        out = out.reshape(out.shape[0], -1) # ! temporary solution
         out = self.fc.forward(out)
         return out
     
@@ -218,6 +218,40 @@ class ResNet:
         out = self.maxpool.backward(out)
         out = self.conv1.backward(out)
         return out
+    
+    
+    def clone_weights_from_torch(self, torch_resnet) -> None:
+        """
+        Clones weights from a PyTorch model to this model.
+        Args:
+            torch_model (nn.Module): A PyTorch model.
+        """
+        self.conv1.weights = torch_resnet.conv1.weight.detach().numpy()
+
+        my_block_collections = [self.conv2_x, self.conv3_x, self.conv4_x, self.conv5_x]
+        torch_block_collections = [torch_resnet.conv2_x, torch_resnet.conv3_x, torch_resnet.conv4_x, torch_resnet.conv5_x]
+
+        for my_block_collection, torch_block_collection in zip(my_block_collections, torch_block_collections):
+            # Used range because torch.nn.Sequential is not iterable
+            for block_i in range(len(torch_block_collection)):
+                my_block = my_block_collection.nn_modules[block_i]
+                torch_block = torch_block_collection[block_i]
+
+                my_block.conv1.weights = torch_block.conv1.weight.detach().numpy()
+                my_block.conv2.weights = torch_block.conv2.weight.detach().numpy()
+                my_block.conv3.weights = torch_block.conv3.weight.detach().numpy()
+
+                if my_block.conv_to_match_dimensions:
+                    my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy()
+                
+                if torch_block.conv_to_match_dimensions:
+                    if not my_block.conv_to_match_dimensions:
+                        raise ValueError("my_block.conv_to_match_dimensions is None but torch_block.conv_to_match_dimensions is not None")
+        
+        self.fc.weights = torch_resnet.fc.weight.detach().numpy().T
+        self.fc.bias = torch_resnet.fc.bias.detach().numpy()
+
+
 
 def resnet101(n_classes: int, img_channels: int = 3) -> ResNet:
     return ResNet(Bottleneck, [3, 4, 23, 3], n_classes, img_channels)
