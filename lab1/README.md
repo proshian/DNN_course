@@ -66,6 +66,11 @@ test:
 ![test accuracy](./images_for_readme/np_CNN_test_accuracy.png)
 ![test f_score](./images_for_readme/np_CNN_test_fscore.png)
 
+
+Ниже результаты обучения реализации numpy версии resnet101 с Adam на 1/10 датасета MNIST в течении 1 эпохи. Метрики выводятся для батчей.
+![numpy resnet101 metrics](./images_for_readme/numpy_resnet101_metrics.png)
+
+
 ## Реализация resnet-101 на torch и сравнение обучения с использованием Adam и AdaBound
 ### Описание разработанной системы (алгоритмы, принципы работы, архитектура)
 Весь код находится в директории [./pytorch_implementations](./pytorch_implementations).
@@ -78,7 +83,7 @@ test:
 
 Ниже результаты обучения моей имплементации resnet101 на torch c Adam (синий) и результаты обучения официальной pytorch имплементации с AdaBound.
 
-![resnet101 metrics](./images_for_readme/torch_resnet_metrics.png)
+![torch resnet101 metrics](./images_for_readme/torch_resnet_metrics.png)
 
 *график обучения более гладций, так как валидация производилась в 4 раза реже обучения*
 
