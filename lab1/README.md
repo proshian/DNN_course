@@ -70,9 +70,24 @@ test:
 ### Описание разработанной системы (алгоритмы, принципы работы, архитектура)
 Весь код находится в директории [./pytorch_implementations](./pytorch_implementations).
 
+В [.\pytorch_implementations\resnet-adam-vs-adabound.ipynb](.\pytorch_implementations\resnet-adam-vs-adabound.ipynb) планируется сравнение обучения на датасете [Stanford Cars](http://ai.stanford.edu/~jkrause/cars/car_dataset.html) моей имплементации resnet101 с оптимизатором Adam и с AdaBound. На данный момент в этом jupyter блокноте произведено обучение с Adam, но не произведено обучение с AdaBound
+
+В [.\pytorch_implementations\resnet.py](.\pytorch_implementations\resnet.py) Находится моя имплементация resnet на pytorch. Классы аналогичны описанным выше для numpy.
+
 ### Результаты работы и тестирования системы (скриншоты, изображения, графики, закономерности)
 
+Ниже результаты обучения моей имплементации resnet101 на torch.
+
+![train metrics](./images_for_readme/torch_resnet_train_metrics.png)
+![val metrics](./images_for_readme/torch_resnet_val_metrics.png)
+
+*график обучения более гладций, так как валидация производилась в 4 раза реже обучения*
+
 ### Выводы по работе
+
+Очевидно, работать с моделями, используя фреймворки удобнее, так как они высокооптимизированы и поддерживают cuda.  
+
+Как только обучу resnet101 с Adabound здесь будет вывод о том, какой оптимизатор в данной задаче был эффективнее.
 
 ## Использованные источники
 1. [Adabound](https://arxiv.org/abs/1902.09843v1)
