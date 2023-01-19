@@ -301,38 +301,14 @@ class Conv2d(TrainableLayer):
         return conv2d_out.reshape(self.out_channels, batch_size, out_height, out_width).transpose(1, 0, 2, 3)
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        return self.semi_matrix_backward(output_gradient)
-
-    def backward_as_mat_mul_unified(self, output_gradient: np.ndarray) -> np.ndarray:
-        """
-        same as matrix multiplication but without other calls
-        """
-        # output_gradient_converted = self._convert_output_gradient(output_gradient)
-        output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
-        # print("output_gradient_converted.shape = ", output_gradient_converted.shape)
-        self.weights_gradient = output_gradient_converted @ self.converted_input.T
-        self.weights_gradient = self.weights_gradient.reshape(self.weights.shape)
-
-        if self.bias is not None:
-            self.bias_gradient = output_gradient_converted.sum(axis = 1).reshape(self.bias.shape)
-
-
-        batch_size, n_input_channels, input_h, input_w = self.input_.shape
-        padded_input_shape = (batch_size, n_input_channels,
-            input_h + 2 * self.padding, input_w + 2 * self.padding)
-
-        converted_weights = self._convert_weights(self.weights)
-
-        input_gradient = converted_weights.T @ output_gradient_converted
-
-        self.input_gradient_before_restoration = input_gradient
-
-        input_gradient = self._restore_input(input_gradient, padded_input_shape)
-
-        return input_gradient[:, :, self.padding:self.padding+input_h, self.padding:self.padding+input_w]
-
+        input_gradient = self.semi_matrix_backward(output_gradient)
+        self.converted_input = None  # free memory
+        return input_gradient
 
     def backward_as_matrix_multiplication(self, output_gradient: np.ndarray) -> np.ndarray:
+        # ! may be change compute_weights_grad_and_bias_grad_matrix_mul so that it takes
+        # output_gradient_converted as input to not do it twise
+
         self.compute_weights_grad_and_bias_grad_matrix_mul(output_gradient)
 
         # output_gradient_converted = self._convert_output_gradient(output_gradient)
@@ -346,12 +322,12 @@ class Conv2d(TrainableLayer):
 
         input_gradient = converted_weights.T @ output_gradient_converted
 
-        self.input_gradient_before_restoration = input_gradient
+        # ! the line below is for debug
+        # self.input_gradient_before_restoration = input_gradient
 
         input_gradient = self._restore_input(input_gradient, padded_input_shape)
 
         return input_gradient[:, :, self.padding:self.padding+input_h, self.padding:self.padding+input_w]
-
     
     # ! May be try backward with two loops
 
