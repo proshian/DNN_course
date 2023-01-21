@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 from NumpyNN.NN_np import (
     # Conv2dWithLoops as Conv2d,
+    Module,
     Conv2d,
     ReLULayer,
     Sequential,
@@ -26,7 +27,7 @@ def conv3x3(in_channels: int, out_channels: int, stride: int = 1) -> Conv2d:
     return Conv2d(in_channels, out_channels, kernel_size=3, padding=1, stride=stride, bias=False)
 
 # Bottleneck numpy only
-class Bottleneck:
+class Bottleneck(Module):
     """
     A "bottleneck" building block of a ResNet.
     This block always consists of a sequence of three convolutions:
@@ -119,7 +120,7 @@ class Bottleneck:
         return self.trainable_layers
     
 
-class ResNet:
+class ResNet(Module):
     """
     ResNet model.
 
@@ -241,10 +242,14 @@ class ResNet:
             for block_i in range(len(torch_block_collection)):
                 my_block = my_block_collection.nn_modules[block_i]
                 torch_block = torch_block_collection[block_i]
+                
+                conv_layer_pairs = [
+                    (my_block.conv1, torch_block.conv1),
+                    (my_block.conv2, torch_block.conv2),
+                    (my_block.conv3, torch_block.conv3)]
 
-                my_block.conv1.weights = torch_block.conv1.weight.detach().numpy()
-                my_block.conv2.weights = torch_block.conv2.weight.detach().numpy()
-                my_block.conv3.weights = torch_block.conv3.weight.detach().numpy()
+                for my_conv, torch_conv in conv_layer_pairs:
+                    my_conv.weights = torch_conv.weight.detach().numpy().reshape(my_conv.weights.shape)
 
                 if my_block.conv_to_match_dimensions:
                     my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy()

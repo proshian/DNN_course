@@ -2,7 +2,11 @@ import numpy as np
 import itertools
 from typing import List, Tuple
 
-class Layer:
+class Module:
+    """
+    Base class for any neural network component. It can be a layer,
+    an activation function, a subnetwork, etc. 
+    """
     def __init__(self):
         pass
     
@@ -15,8 +19,20 @@ class Layer:
     def get_trainable_layers(self) -> List['TrainableLayer']:
         return []
     
+    training: bool = True
+    
+    def train(self):
+        self.training = True
+        for layer in self.get_trainable_layers():
+            layer.train()
+    
+    def eval(self):
+        self.training = False
+        for layer in self.get_trainable_layers():
+            layer.eval()
+    
 
-class TrainableLayer(Layer):
+class TrainableLayer(Module):
     id_iter = itertools.count()
 
     def __init__(self):
@@ -388,7 +404,7 @@ class Conv2d(TrainableLayer):
             parameters_and_gradients_and_ids.append((self.bias, self.bias_gradient, bias_id))
         return parameters_and_gradients_and_ids
 
-class MaxPool2d(Layer):
+class MaxPool2d(Module):
     # ! May be use inheritance or a global function to perform padding
     def __init__(self, kernel_size: int, stride: int, padding: int = 0):
         self.kernel_size = kernel_size
@@ -492,11 +508,8 @@ class BatchNormalization2d(TrainableLayer):
             (self.beta, self.beta_gradient, beta_id)]
         return parameters_and_gradients_and_ids
     
-    def set_train(self, train: bool):
-        self.train = train
-    
 
-class Flatten(Layer):
+class Flatten(Module):
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_shape = input_.shape
         batch_size = input_.shape[0]
@@ -506,7 +519,7 @@ class Flatten(Layer):
         return output_gradient.reshape(self.input_shape)
 
 
-class ActivationLayer(Layer):
+class ActivationLayer(Module):
     """
     This base class is not crucial but it presevrves OOP ideology and 
     it is useful for type hinting like List[ActivationLayer].
@@ -547,7 +560,7 @@ def softmax(x: np.ndarray) -> np.ndarray:
     e_subtracted = np.exp(x - np.max(x, axis=1, keepdims=True)) 
     return e_subtracted / np.sum(e_subtracted, axis=1, keepdims=True)
 
-class SoftMaxLayer(Layer):
+class SoftMaxLayer(Module):
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.output = softmax(input_)
         return self.output
@@ -590,7 +603,7 @@ class CrossEntropyLossWithSoftMax:
 
 
 class Optimizer:
-    def __init__(self, trainable_layers: List[Layer], learning_rate: float):
+    def __init__(self, trainable_layers: List[TrainableLayer], learning_rate: float):
         self.learning_rate = learning_rate
         self.trainable_layers = trainable_layers
     
@@ -640,7 +653,7 @@ class AdamOptimizer(Optimizer):
 
 
 class GradientDescentOptimizer(Optimizer):
-    def __init__(self, trainable_layers: List[Layer], learning_rate: float = 0.001):
+    def __init__(self, trainable_layers: List[Module], learning_rate: float = 0.001):
         self.trainable_layers = trainable_layers
         self.learning_rate = learning_rate
 
@@ -651,7 +664,8 @@ class GradientDescentOptimizer(Optimizer):
             for parameter, gradient, _ in layer.get_parameters_and_gradients_and_ids():
                 parameter -= self.learning_rate * gradient
     
-
+# ! SequentialFullyConnected class is only used to maintain numpy_FC.ipynb.
+# The notebook and the class are going to be removed.
 class SequentialFullyConnected:
     """
     Feed forward neural network stack.
@@ -662,7 +676,7 @@ class SequentialFullyConnected:
             are applied to the output of each layer. The length of
             activations should be equal to the len(n_neurons) - 1.
     """
-    def __init__(self, n_neurons: List[int], activations: List[Layer]):
+    def __init__(self, n_neurons: List[int], activations: List[Module]):
         
         self.n_neurons = n_neurons
         self.activations = activations
@@ -686,7 +700,13 @@ class SequentialFullyConnected:
         return output_gradient
 
 
-class Sequential:
+class Sequential(Module):
+    """
+    A stack of sequentially connected neural network modules. 
+    Attributes:
+        nn_modules: a list of neural network modules that are going to be
+            connected sequentially.
+    """
     def __init__(self, nn_modules: List):
         self.trainable_layers = []
         self.nn_modules = nn_modules
