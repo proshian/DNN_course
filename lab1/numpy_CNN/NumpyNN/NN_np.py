@@ -440,6 +440,62 @@ class MaxPool2d(Layer):
                         
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
 
+
+class BatchNormalization2d(TrainableLayer):
+    def __init__(self, n_channels: int):
+        self.n_channels = n_channels
+        self.gamma = np.ones((1, n_channels, 1, 1))  # new variance
+        self.beta = np.zeros((1, n_channels, 1, 1))  # new mean
+        self.eps = 1e-8
+        self.train = True
+    
+    def forward(self, input_: np.ndarray) -> np.ndarray:
+        self.input_ = input_
+        # In the training phase, we update self.mean and self.std
+        # In the testing phase, we use the mean and std of the training phase
+        if self.train:
+            self.mean = input_.mean(axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
+            self.var = input_.var(axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
+            std = np.sqrt(self.var + self.eps).reshape(1, self.n_channels, 1, 1)
+        self.norm_input = (input_ - self.mean) / std
+        output = self.gamma * self.norm_input + self.beta
+        return output
+    
+    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
+        # The formulas are taken from: https://neerc.ifmo.ru/wiki/index.php?title=Batch-normalization
+        self.beta_gradient = np.sum(output_gradient, axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
+        self.gamma_gradient = np.sum(output_gradient * self.norm_input, axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
+
+        norm_input_gradient = output_gradient * self.gamma
+
+        prod = norm_input_gradient * (self.input_ - self.mean)
+        sum_ = np.sum(prod, axis = (0, 2, 3), keepdims=True)
+        var_gradient = -0.5 * np.power(self.var + self.eps, -1.5) * sum_
+
+        batch_size = self.input_.shape[0]
+        
+        mean_gradient = -1 / np.sqrt(self.var + self.eps) * \
+            np.sum(norm_input_gradient, axis = (0, 2, 3), keepdims=True) + \
+            var_gradient * -2 * np.sum(self.input_ - self.mean, axis = (0, 2, 3), keepdims=True) / batch_size    
+                                           
+        input_gradient = norm_input_gradient / np.sqrt(self.var + self.eps) + \
+            var_gradient * 2 * (self.input_ - self.mean) / batch_size + \
+            mean_gradient / batch_size
+        
+        return input_gradient
+    
+    def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
+        gamma_id = 'g' + self.id
+        beta_id = 'b' + self.id
+        parameters_and_gradients_and_ids = [
+            (self.gamma, self.gamma_gradient, gamma_id),
+            (self.beta, self.beta_gradient, beta_id)]
+        return parameters_and_gradients_and_ids
+    
+    def set_train(self, train: bool):
+        self.train = train
+    
+
 class Flatten(Layer):
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_shape = input_.shape
