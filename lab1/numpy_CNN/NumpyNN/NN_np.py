@@ -14,6 +14,7 @@ class Layer:
     
     def get_trainable_layers(self) -> List['TrainableLayer']:
         return []
+    
 
 class TrainableLayer(Layer):
     id_iter = itertools.count()
@@ -68,8 +69,6 @@ class FullyConnectedLayer(TrainableLayer):
 
 
 class Conv2dWithLoops(TrainableLayer):
-    id_iter = itertools.count()
-
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
                  stride: int = 1, padding: int = 0, bias: bool = True):
         super(Conv2dWithLoops, self).__init__()
@@ -171,8 +170,6 @@ class Conv2dWithLoops(TrainableLayer):
 
 
 class Conv2d(TrainableLayer):
-    id_iter = itertools.count()
-
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int,
                  stride: int = 1, padding: int = 0, bias: bool = True):
         super(Conv2d, self).__init__()
@@ -273,7 +270,15 @@ class Conv2d(TrainableLayer):
         for b_i in range(batch_size):
             for r in range(output_height):
                 for c in range(output_width):
-                    padded_input[b_i, :, r*self.stride:r*self.stride+self.kernel_size, c*self.stride:c*self.stride+self.kernel_size] = converted_input[:, image_line_index].reshape(1, -1, self.kernel_size, self.kernel_size)
+                    # r_start is row position of the first element of the kernel
+                    r_start = r*self.stride 
+                    # r_end is row position of the last element of the kernel
+                    r_end = r*self.stride+self.kernel_size
+                    # c_start is column position of the first element of the kernel
+                    c_start = c*self.stride
+                    # c_end is column position of the last element of the kernel
+                    c_end = c*self.stride+self.kernel_size
+                    padded_input[b_i, :, r_start:r_end, c_start:c_end] = converted_input[:, image_line_index].reshape(1, -1, self.kernel_size, self.kernel_size)
                     image_line_index += 1
         return padded_input
 
