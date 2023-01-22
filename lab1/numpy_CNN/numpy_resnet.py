@@ -10,6 +10,7 @@ from NumpyNN.NN_np import (
     MaxPool2d,
     FullyConnectedLayer,
     TrainableLayer,
+    BatchNormalization2d,
     Flatten,
 )
 
@@ -53,9 +54,15 @@ class Bottleneck(Module):
         self.bottleneck_depth = bottleneck_depth
         self.stride_for_downsampling = stride_for_downsampling
 
+
+        self.bn1 = BatchNormalization2d(bottleneck_depth)
+        self.bn2 = BatchNormalization2d(bottleneck_depth)
+        self.bn3 = BatchNormalization2d(bottleneck_depth * self.expansion)
+
         self.conv1 = conv1x1(in_channels, bottleneck_depth, stride_for_downsampling)
         self.conv2 = conv3x3(bottleneck_depth, bottleneck_depth)
         self.conv3 = conv1x1(bottleneck_depth, bottleneck_depth * self.expansion)
+
         self.relu1 = ReLULayer()
         self.relu2 = ReLULayer()
         self.relu3 = ReLULayer()
@@ -90,12 +97,15 @@ class Bottleneck(Module):
         # The layers from conv1 to conv3 are main path.
         #! Maybe make them members of a sequential network object?
         out = self.conv1.forward(input_)
+        out = self.bn1.forward(out)
         out = self.relu1.forward(out)
 
         out = self.conv2.forward(out)
+        out = self.bn2.forward(out)
         out = self.relu2.forward(out)
 
         out = self.conv3.forward(out)
+        out = self.bn3.forward(out)
 
         out += identity
         out = self.relu3.forward(out)
@@ -108,7 +118,7 @@ class Bottleneck(Module):
         
         # The layers from conv1 to conv3 are main path.
         #! Maybe make them members of a sequential network object?
-        for layer in ([self.conv3, self.relu2, self.conv2, self.relu1, self.conv1]):
+        for layer in ([self.bn3, self.conv3, self.relu2, self.bn2, self.conv2, self.relu1, self.bn1, self.conv1]):
             main_path_output_gradient = layer.backward(main_path_output_gradient)
         
         if self.conv_to_match_dimensions is not None:
@@ -144,6 +154,7 @@ class ResNet(Module):
         self.conv1 = Conv2d(
             img_channels, self.cur_block_in_channels,
             kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = BatchNormalization2d(self.cur_block_in_channels)
         self.maxpool = MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.relu = ReLULayer()
         self.conv2_x = self._make_blocks(block_nums[0], 64, False)
@@ -201,8 +212,9 @@ class ResNet(Module):
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         out = self.conv1.forward(input_)
-        out = self.maxpool.forward(out)
+        out = self.bn1.forward(out)
         out = self.relu.forward(out)
+        out = self.maxpool.forward(out)
         out = self.conv2_x.forward(out)
         out = self.conv3_x.forward(out)
         out = self.conv4_x.forward(out)
@@ -220,12 +232,15 @@ class ResNet(Module):
         out = self.conv4_x.backward(out)
         out = self.conv3_x.backward(out)
         out = self.conv2_x.backward(out)
-        out = self.relu.backward(out)
         out = self.maxpool.backward(out)
+        out = self.relu.backward(out)
+        out = self.bn1.backward(out)
         out = self.conv1.backward(out)
         return out
     
-    
+    # ! Add copying of batchnorm parameters
+    # ! May be setting momentum to 0 or 1 (not sure)
+    # ! So that torch acts like there is no momentum
     def clone_weights_from_torch(self, torch_resnet) -> None:
         """
         Clones weights from a PyTorch model to this model.

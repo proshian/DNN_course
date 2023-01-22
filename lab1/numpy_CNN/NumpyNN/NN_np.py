@@ -17,6 +17,8 @@ class Module:
         raise NotImplementedError
     
     def get_trainable_layers(self) -> List['TrainableLayer']:
+        # ! May be add Layer (or UntrainableLayer) class and mode this version
+        # ! of get_trainable_layers to it. And here raise NotImplementedError
         return []
     
     training: bool = True
@@ -489,14 +491,15 @@ class BatchNormalization2d(TrainableLayer):
         var_gradient = -0.5 * np.power(self.var + self.eps, -1.5) * sum_
 
         batch_size, n_channels, height, width = self.input_.shape
+        bhw = batch_size * height * width
         std_inv = 1.0 / np.sqrt(self.var + self.eps)
 
         mean_gradient = - std_inv * np.sum(norm_input_gradient, axis = (0, 2, 3), keepdims=True) + \
-            var_gradient * -2 * np.sum(self.input_ - self.mean, axis = (0, 2, 3), keepdims=True) / batch_size / height / width
+            var_gradient * -2 * np.mean(self.input_ - self.mean, axis = (0, 2, 3), keepdims=True)
         
         input_gradient = norm_input_gradient / np.sqrt(self.var + self.eps) + \
-            var_gradient * 2 * (self.input_ - self.mean) / batch_size / height / width + \
-            mean_gradient / batch_size / height / width
+            var_gradient * 2 * (self.input_ - self.mean) / bhw + \
+            mean_gradient / bhw
 
         return input_gradient
         

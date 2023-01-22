@@ -48,6 +48,10 @@ class Bottleneck(nn.Module):
         self.bottleneck_depth = bottleneck_depth
         self.stride_for_downsampling = stride_for_downsampling
 
+        self.bn1 = nn.BatchNorm2d(bottleneck_depth)
+        self.bn2 = nn.BatchNorm2d(bottleneck_depth)
+        self.bn3 = nn.BatchNorm2d(bottleneck_depth * self.expansion)
+
         self.conv1 = conv1x1(in_channels, bottleneck_depth, stride_for_downsampling)
         self.conv2 = conv3x3(bottleneck_depth, bottleneck_depth)
         self.conv3 = conv1x1(bottleneck_depth, bottleneck_depth * self.expansion)
@@ -75,12 +79,15 @@ class Bottleneck(nn.Module):
             identity = x
 
         out = self.conv1(x)
+        out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
+        out = self.bn2(out)
         out = self.relu(out)
 
         out = self.conv3(out)
+        out = self.bn3(out)
 
         out += identity
         out = self.relu(out)
@@ -112,6 +119,7 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(
             img_channels, self.cur_block_in_channels,
             kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = nn.BatchNorm2d(self.cur_block_in_channels)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.relu = nn.ReLU(inplace=True)
         self.conv2_x = self._make_blocks(block_nums[0], 64, False)
@@ -154,8 +162,9 @@ class ResNet(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.conv1(x)
-        x = self.maxpool(x)
+        x = self.bn1(x)
         x = self.relu(x)
+        x = self.maxpool(x)
         x = self.conv2_x(x)
         x = self.conv3_x(x)
         x = self.conv4_x(x)
