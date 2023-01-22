@@ -488,18 +488,18 @@ class BatchNormalization2d(TrainableLayer):
         sum_ = np.sum(prod, axis = (0, 2, 3), keepdims=True)
         var_gradient = -0.5 * np.power(self.var + self.eps, -1.5) * sum_
 
-        batch_size = self.input_.shape[0]
+        batch_size, n_channels, height, width = self.input_.shape
+        std_inv = 1.0 / np.sqrt(self.var + self.eps)
+
+        mean_gradient = - std_inv * np.sum(norm_input_gradient, axis = (0, 2, 3), keepdims=True) + \
+            var_gradient * -2 * np.sum(self.input_ - self.mean, axis = (0, 2, 3), keepdims=True) / batch_size / height / width
         
-        mean_gradient = -1 / np.sqrt(self.var + self.eps) * \
-            np.sum(norm_input_gradient, axis = (0, 2, 3), keepdims=True) + \
-            var_gradient * -2 * np.sum(self.input_ - self.mean, axis = (0, 2, 3), keepdims=True) / batch_size    
-                                           
         input_gradient = norm_input_gradient / np.sqrt(self.var + self.eps) + \
-            var_gradient * 2 * (self.input_ - self.mean) / batch_size + \
-            mean_gradient / batch_size
-        
+            var_gradient * 2 * (self.input_ - self.mean) / batch_size / height / width + \
+            mean_gradient / batch_size / height / width
+
         return input_gradient
-    
+        
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
         gamma_id = 'g' + self.id
         beta_id = 'b' + self.id
