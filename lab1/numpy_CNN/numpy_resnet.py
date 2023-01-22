@@ -77,6 +77,7 @@ class Bottleneck(Module):
         self.conv_to_match_dimensions = None
         if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
             self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
+            self.bn_for_residual = BatchNormalization2d(bottleneck_depth * self.expansion)
         
         self.trainable_layers = [self.conv1, self.conv2, self.conv3]
         if self.conv_to_match_dimensions is not None:
@@ -91,6 +92,7 @@ class Bottleneck(Module):
         
         if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions.forward(input_)
+            identity = self.bn_for_residual.forward(identity)
         else:
             identity = input_
 
@@ -122,6 +124,7 @@ class Bottleneck(Module):
             main_path_output_gradient = layer.backward(main_path_output_gradient)
         
         if self.conv_to_match_dimensions is not None:
+            identity_output_gradient = self.bn_for_residual.backward(identity_output_gradient)
             identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
         
         return main_path_output_gradient + identity_output_gradient
@@ -244,6 +247,7 @@ class ResNet(Module):
     def clone_weights_from_torch(self, torch_resnet) -> None:
         """
         Clones weights from a PyTorch model to this model.
+        ! Note that the method modifies torch_resnet's batchnorm momentums to 1!
         Args:
             torch_model (nn.Module): A PyTorch model.
         """
@@ -266,15 +270,35 @@ class ResNet(Module):
                 for my_conv, torch_conv in conv_layer_pairs:
                     my_conv.weights = torch_conv.weight.detach().numpy().reshape(my_conv.weights.shape)
 
+
+                bn_pairs = [
+                    (my_block.bn1, torch_block.bn1),
+                    (my_block.bn2, torch_block.bn2),
+                    (my_block.bn3, torch_block.bn3)]
+
+                for my_bn, torch_bn in bn_pairs:
+                    my_bn.gamma = torch_bn.weight.detach().numpy().reshape(my_bn.gamma.shape)
+                    my_bn.beta = torch_bn.bias.detach().numpy().reshape(my_bn.beta.shape)
+                    my_bn.mean = torch_bn.running_mean.detach().numpy().reshape(my_bn.mean.shape)
+                    my_bn.var = torch_bn.running_var.detach().numpy().reshape(my_bn.var.shape)
+                    torch_bn.momentum = 1
+
+
                 if my_block.conv_to_match_dimensions:
-                    my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy()
+                    my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy().reshape(my_block.conv_to_match_dimensions.weights.shape)
+
+                    my_block.bn_for_residual.gamma = torch_block.bn_for_residual.weight.detach().numpy().reshape(my_block.bn_for_residual.gamma.shape)
+                    my_block.bn_for_residual.beta = torch_block.bn_for_residual.bias.detach().numpy().reshape(my_block.bn_for_residual.beta.shape)
+                    my_block.bn_for_residual.mean = torch_block.bn_for_residual.running_mean.detach().numpy().reshape(my_block.bn_for_residual.mean.shape)
+                    my_block.bn_for_residual.var = torch_block.bn_for_residual.running_var.detach().numpy().reshape(my_block.bn_for_residual.var.shape)
+                    torch_block.bn_for_residual.momentum = 1
                 
                 if torch_block.conv_to_match_dimensions:
                     if not my_block.conv_to_match_dimensions:
                         raise ValueError("my_block.conv_to_match_dimensions is None but torch_block.conv_to_match_dimensions is not None")
         
-        self.fc.weights = torch_resnet.fc.weight.detach().numpy().T
-        self.fc.bias = torch_resnet.fc.bias.detach().numpy()
+        self.fc.weights = torch_resnet.fc.weight.detach().numpy().T.reshape(self.fc.weights.shape)
+        self.fc.bias = torch_resnet.fc.bias.detach().numpy().reshape(self.fc.bias.shape)
 
 
 

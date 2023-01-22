@@ -68,6 +68,7 @@ class Bottleneck(nn.Module):
         self.conv_to_match_dimensions = None
         if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
             self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
+            self.bn_for_residual = nn.BatchNorm2d(bottleneck_depth * self.expansion)
         # ! Возможно, стоит вынести проверку на необходимость применения conv_to_match_dimensions
         # отсюда в ResNet и передавать в Bottleneck параметр need_to_match_dimensions
     
@@ -75,6 +76,7 @@ class Bottleneck(nn.Module):
 
         if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions(x)
+            identity = self.bn_for_residual(identity)
         else:
             identity = x
 

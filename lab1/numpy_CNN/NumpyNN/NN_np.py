@@ -26,11 +26,17 @@ class Module:
     def train(self):
         self.training = True
         for layer in self.get_trainable_layers():
+            # ! This case is only for layers (not for bigger components)
+            if self == layer:
+                continue
             layer.train()
     
     def eval(self):
         self.training = False
         for layer in self.get_trainable_layers():
+            # ! This case is only for layers (not for bigger components)
+            if self == layer:
+                continue
             layer.eval()
     
 
@@ -462,8 +468,12 @@ class MaxPool2d(Module):
 class BatchNormalization2d(TrainableLayer):
     def __init__(self, n_channels: int):
         self.n_channels = n_channels
-        self.gamma = np.ones((1, n_channels, 1, 1))  # new variance
-        self.beta = np.zeros((1, n_channels, 1, 1))  # new mean
+        self.gamma = np.ones((1, n_channels, 1, 1))  # new variance after normalization
+        self.beta = np.zeros((1, n_channels, 1, 1))  # new mean after normalization
+        # Added mean and var initialization to avoid a rare situation
+        # where the model is not traind but the flag self.train is set to False
+        self.mean = np.zeros((1, n_channels, 1, 1))
+        self.var = np.ones((1, n_channels, 1, 1))
         self.eps = 1e-8
         self.train = True
     
