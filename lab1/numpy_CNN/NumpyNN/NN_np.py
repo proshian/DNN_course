@@ -239,7 +239,7 @@ class Conv2d(TrainableLayer):
         # ! with the same values as torch implementation and
         # ! implementation with loops 
 
-        # ! Those for loops are better then naive implementation since the 
+        # ! Those "for loops" are better then naive implementation since the 
         # ! conversion is performed a single time while the matrix
         # ! multiplication is performed on every step of training 
         flattened_filters = []
@@ -251,7 +251,7 @@ class Conv2d(TrainableLayer):
     def _convert_input(self, padded_input: np.ndarray) -> np.ndarray:
         converted_input = None
 
-        # I will call feature maps images
+        # I will refer to feature maps as images
         # The columns of a converted image are concatenated horizontally
         # The separate images are concatenated horizontally too.
         # Thus we will append all columns of all images in one list
@@ -279,7 +279,13 @@ class Conv2d(TrainableLayer):
         return converted_input
 
     
-    def _restore_input(self, converted_input: np.ndarray, padded_input_shape) -> np.ndarray:
+    def _restore_input_gradient(self, converted_input: np.ndarray, padded_input_shape) -> np.ndarray:
+        """
+        If we needed to restore the input after _convert_input was applied we would need
+        to use a function exactly like this but padded_input[b_i, :, r_start:r_end, c_start:c_end]
+        would be replaced by converted_input[:, image_line_index].reshape(in_channels, kernel_size, kernel_size)
+        insted of accumulating.
+        """
         # This method restores input after _convert_input was applied
         # It is used in backward to restore the input_gradient to proper shape 
         padded_input = np.zeros(padded_input_shape)
@@ -299,9 +305,11 @@ class Conv2d(TrainableLayer):
                     c_start = c*self.stride
                     # c_end is column position of the last element of the kernel
                     c_end = c*self.stride+self.kernel_size
-                    padded_input[b_i, :, r_start:r_end, c_start:c_end] = converted_input[:, image_line_index].reshape(1, -1, self.kernel_size, self.kernel_size)
+                    padded_input[b_i, :, r_start:r_end, c_start:c_end] += converted_input[:, image_line_index].reshape(-1, self.kernel_size, self.kernel_size)
                     image_line_index += 1
         return padded_input
+    
+
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
         # Used this explanation https://stepik.org/lesson/309343/step/7?unit=291492
@@ -327,74 +335,32 @@ class Conv2d(TrainableLayer):
         return conv2d_out.reshape(self.out_channels, batch_size, out_height, out_width).transpose(1, 0, 2, 3)
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        input_gradient = self.semi_matrix_backward(output_gradient)
+        input_gradient = self.backward_as_matrix_multiplication(output_gradient)
         self.converted_input = None  # free memory
         return input_gradient
 
     def backward_as_matrix_multiplication(self, output_gradient: np.ndarray) -> np.ndarray:
-        # ! may be change compute_weights_grad_and_bias_grad_matrix_mul so that it takes
-        # output_gradient_converted as input to not do it twise
-
-        self.compute_weights_grad_and_bias_grad_matrix_mul(output_gradient)
-
-        # output_gradient_converted = self._convert_output_gradient(output_gradient)
         output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
-        batch_size, n_input_channels, input_h, input_w = self.input_.shape
-        padded_input_shape = (batch_size, n_input_channels,
-            input_h + 2 * self.padding, input_w + 2 * self.padding)
 
 
-        converted_weights = self._convert_weights(self.weights)
-
-        input_gradient = converted_weights.T @ output_gradient_converted
-
-        # ! the line below is for debug
-        # self.input_gradient_before_restoration = input_gradient
-
-        input_gradient = self._restore_input(input_gradient, padded_input_shape)
-
-        return input_gradient[:, :, self.padding:self.padding+input_h, self.padding:self.padding+input_w]
-    
-    # ! May be try backward with two loops
-
-    def get_input_gradient_only_with_loops(self, output_gradient: np.ndarray) -> np.ndarray:
-        """
-        output_gradient is a 4D array with shape (batch_size, out_channels, out_height, out_width)
-        """
-        batch_size, out_channels, out_height, out_width = output_gradient.shape
-        _, _, height, width = self.input_.shape
-        padded_input = self._get_padded_input(self.input_)
-        input_gradient = np.zeros_like(padded_input)
-
-        for bi in range(batch_size):
-            for oci in range(out_channels):
-                for h in range(out_height):
-                    for w in range(out_width):
-                        # h_start is row position of the first element of the kernel
-                        h_start = h*self.stride 
-                        # h_end is row position of the last element of the kernel
-                        h_end = h*self.stride+self.kernel_size
-                        # w_start is column position of the first element of the kernel
-                        w_start = w*self.stride
-                        # w_end is column position of the last element of the kernel
-                        w_end = w*self.stride+self.kernel_size
-                        # print(self.weights[oci].shape, output_gradient[bi, oci, h, w])
-                        input_gradient[bi, :, h_start:h_end, w_start:w_end] += (
-                            self.weights[oci] * output_gradient[bi, oci, h, w])
-        return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
-
-    def compute_weights_grad_and_bias_grad_matrix_mul(self, output_gradient: np.ndarray) -> None:
-        output_gradient_converted = output_gradient.transpose(1, 0, 2, 3).reshape(self.out_channels, -1)
-        # print("output_gradient_converted.shape = ", output_gradient_converted.shape)
         self.weights_gradient = output_gradient_converted @ self.converted_input.T
         self.weights_gradient = self.weights_gradient.reshape(self.weights.shape)
 
         if self.bias is not None:
             self.bias_gradient = output_gradient_converted.sum(axis = 1).reshape(self.bias.shape)
 
-    def semi_matrix_backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        self.compute_weights_grad_and_bias_grad_matrix_mul(output_gradient)
-        return self.get_input_gradient_only_with_loops(output_gradient)
+
+        converted_weights = self._convert_weights(self.weights)
+        input_gradient = converted_weights.T @ output_gradient_converted
+
+        batch_size, n_input_channels, input_h, input_w = self.input_.shape
+        padded_input_shape = (batch_size, n_input_channels,
+            input_h + 2 * self.padding, input_w + 2 * self.padding)
+
+        input_gradient = self._restore_input_gradient(input_gradient, padded_input_shape)
+
+        return input_gradient[:, :, self.padding:self.padding+input_h, self.padding:self.padding+input_w]
+
     
     def get_W_and_b_ids(self) -> Tuple[str, str]:
         weights_id = f"dW{self.id}"
@@ -408,6 +374,7 @@ class Conv2d(TrainableLayer):
         if self.bias is not None:
             parameters_and_gradients_and_ids.append((self.bias, self.bias_gradient, bias_id))
         return parameters_and_gradients_and_ids
+
 
 class MaxPool2d(Module):
     # ! May be use inheritance or a global function to perform padding

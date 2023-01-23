@@ -1,3 +1,4 @@
+# README не обновлено и не отражает текущую ситуацию
 # Реализация ResNet-101, Adam, AbaBound (pytorch vs numpy)
 
 <!-- 
