@@ -467,6 +467,7 @@ class MaxPool2d(Module):
 
 class BatchNormalization2d(TrainableLayer):
     def __init__(self, n_channels: int):
+        super(BatchNormalization2d, self).__init__()
         self.n_channels = n_channels
         self.gamma = np.ones((1, n_channels, 1, 1))  # new variance after normalization
         self.beta = np.zeros((1, n_channels, 1, 1))  # new mean after normalization
