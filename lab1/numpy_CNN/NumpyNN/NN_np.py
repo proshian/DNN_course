@@ -54,9 +54,6 @@ class TrainableLayer(Module):
         return [self]
 
 class FullyConnectedLayer(TrainableLayer):
-    
-    id_iter = itertools.count()
-
     def __init__(self, n_input_neurons: int, n_output_neurons: int):
         # ! id was moved to the Layer class
         super(FullyConnectedLayer, self).__init__()
@@ -476,6 +473,8 @@ class BatchNormalization2d(TrainableLayer):
         self.mean = np.zeros((1, n_channels, 1, 1))
         self.var = np.ones((1, n_channels, 1, 1))
         self.eps = 1e-8
+        self.gamma_gradient = None
+        self.beta_gradient = None
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
@@ -514,8 +513,8 @@ class BatchNormalization2d(TrainableLayer):
         return input_gradient
         
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
-        gamma_id = 'g' + self.id
-        beta_id = 'b' + self.id
+        gamma_id = f'g{self.id}'
+        beta_id = f'b{self.id}'
         parameters_and_gradients_and_ids = [
             (self.gamma, self.gamma_gradient, gamma_id),
             (self.beta, self.beta_gradient, beta_id)]
@@ -648,6 +647,8 @@ class AdamOptimizer(Optimizer):
         for layer in self.trainable_layers:
             for param, _, id in layer.get_parameters_and_gradients_and_ids():
                 #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
+                # ! The params are used because they have the same shape as
+                # ! the gradients and are garanteed to be initialized.
                 self.m[id] = np.zeros_like(param)
                 self.v[id] = np.zeros_like(param)
     
