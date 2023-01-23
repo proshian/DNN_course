@@ -475,16 +475,15 @@ class BatchNormalization2d(TrainableLayer):
         self.mean = np.zeros((1, n_channels, 1, 1))
         self.var = np.ones((1, n_channels, 1, 1))
         self.eps = 1e-8
-        self.train = True
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
         # In the training phase, we update self.mean and self.std
         # In the testing phase, we use the mean and std of the training phase
-        if self.train:
+        if self.training:
             self.mean = input_.mean(axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
             self.var = input_.var(axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
-            std = np.sqrt(self.var + self.eps).reshape(1, self.n_channels, 1, 1)
+        std = np.sqrt(self.var + self.eps).reshape(1, self.n_channels, 1, 1)
         self.norm_input = (input_ - self.mean) / std
         output = self.gamma * self.norm_input + self.beta
         return output

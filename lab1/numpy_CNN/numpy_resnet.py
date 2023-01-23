@@ -79,13 +79,11 @@ class Bottleneck(Module):
             self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
             self.bn_for_residual = BatchNormalization2d(bottleneck_depth * self.expansion)
         
-        self.trainable_layers = [self.conv1, self.conv2, self.conv3]
+        # ! Need to do this in a better way.
+        self.trainable_layers = [self.conv1, self.conv2, self.conv3, self.bn1, self.bn2, self.bn3]
         if self.conv_to_match_dimensions is not None:
             self.trainable_layers.append(self.conv_to_match_dimensions)
-        
-
-        self.trainable_layers = [self.conv1, self.conv2, self.conv3]
-        
+            self.trainable_layers.append(self.bn_for_residual)
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
@@ -168,9 +166,9 @@ class ResNet(Module):
         # ! Maybe add reshape
         self.fc = FullyConnectedLayer(512 * block.expansion, n_classes)
 
-
+        # ! Need to do this in a better way.
         nn_modules = [
-            self.conv1, self.conv2_x, self.conv3_x,
+            self.conv1, self.bn1, self.conv2_x, self.conv3_x,
             self.conv4_x, self.conv5_x, self.fc
         ]
 
