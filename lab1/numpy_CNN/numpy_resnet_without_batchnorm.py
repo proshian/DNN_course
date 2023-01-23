@@ -15,12 +15,7 @@ from NumpyNN.NN_np import (
 
 
 def conv1x1(in_channels: int, out_channels: int, stride: int = 1) -> Conv2d:
-    # return Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, padding=0, bias=False)
-    conv = Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, padding=0, bias=False)
-    # backward as martix multiplication works properly for any 1x1 convolution.
-    # ! When backward is fixed the only line that should be left is the first (commented) one.
-    conv.backward = conv.backward_as_matrix_multiplication
-    return conv
+    return Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, padding=0, bias=False)
 
 def conv3x3(in_channels: int, out_channels: int, stride: int = 1) -> Conv2d:
     """3x3 "same" convolution"""
