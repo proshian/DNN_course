@@ -430,26 +430,57 @@ class MaxPool2d(Module):
 
 
 class BatchNormalization2d(TrainableLayer):
-    def __init__(self, n_channels: int):
+    """
+    Args:
+        n_channels: number of channels in the input
+        momentum: momentum for running mean and variance (coeff for exponential moving average)
+            Note: statistics are update like this:
+                running_mean = (1 - momentum) * running_mean + momentum * mean, which is not
+                typical for momentum. This is done to be consistent with PyTorch.
+                So the possible values for momentum are in the range (0, 1)
+                # ! Not sure is 1 is allowed but 0 is not.
+    """
+    def __init__(self, n_channels: int, momentum: float = 0.1):
         super(BatchNormalization2d, self).__init__()
         self.n_channels = n_channels
         self.gamma = np.ones((1, n_channels, 1, 1))  # new variance after normalization
         self.beta = np.zeros((1, n_channels, 1, 1))  # new mean after normalization
         # Added mean and var initialization to avoid a rare situation
         # where the model is not traind but the flag self.train is set to False
-        self.mean = np.zeros((1, n_channels, 1, 1))
-        self.var = np.ones((1, n_channels, 1, 1))
+        self.running_mean = np.zeros((1, n_channels, 1, 1))
+        self.running_var = np.ones((1, n_channels, 1, 1))
         self.eps = 1e-8
         self.gamma_gradient = None
         self.beta_gradient = None
+        self.momentum = momentum
+        self.num_batches_trained_on = 0
     
+    def update_running_mean_and_var(self):
+        # This is one of the ways to cope with bias towards first value (bias correction)
+        # if np.equal(self.running_mean, 0).all():
+        #     self.running_mean = self.mean
+        #     self.running_var = self.var
+        #     return
+        self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * self.mean
+        self.running_var = (1 - self.momentum) * self.running_var + self.momentum * self.var
+
+        # bias correction
+        self.running_mean /= self.momentum**(self.num_batches_trained_on + 1)
+        self.running_var /= self.momentum**(self.num_batches_trained_on + 1)
+        self.num_batches_trained_on += 1
+
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
-        # In the training phase, we update self.mean and self.std
-        # In the testing phase, we use the mean and std of the training phase
+        # In the training phase, we use the mean and std of the current batch
+        # In the testing phase, we use the exponential moving average
+        # of the mean and std across all batches
         if self.training:
-            self.mean = input_.mean(axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
-            self.var = input_.var(axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
+            self.mean = input_.mean(axis = (0, 2, 3), keepdims = True)
+            self.var = input_.var(axis = (0, 2, 3), keepdims = True)
+            self.update_running_mean_and_var()
+        else:
+            self.mean = self.running_mean
+            self.var = self.running_var
         std = np.sqrt(self.var + self.eps).reshape(1, self.n_channels, 1, 1)
         self.norm_input = (input_ - self.mean) / std
         output = self.gamma * self.norm_input + self.beta
@@ -457,8 +488,8 @@ class BatchNormalization2d(TrainableLayer):
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         # The formulas are taken from: https://neerc.ifmo.ru/wiki/index.php?title=Batch-normalization
-        self.beta_gradient = np.sum(output_gradient, axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
-        self.gamma_gradient = np.sum(output_gradient * self.norm_input, axis = (0, 2, 3)).reshape(1, self.n_channels, 1, 1)
+        self.beta_gradient = np.sum(output_gradient, axis = (0, 2, 3), keepdims=True)
+        self.gamma_gradient = np.sum(output_gradient * self.norm_input, axis = (0, 2, 3), keepdims=True)
 
         norm_input_gradient = output_gradient * self.gamma
 

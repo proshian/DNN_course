@@ -272,8 +272,8 @@ class ResNet(Module):
                 for my_bn, torch_bn in bn_pairs:
                     my_bn.gamma = torch_bn.weight.detach().numpy().reshape(my_bn.gamma.shape)
                     my_bn.beta = torch_bn.bias.detach().numpy().reshape(my_bn.beta.shape)
-                    my_bn.mean = torch_bn.running_mean.detach().numpy().reshape(my_bn.mean.shape)
-                    my_bn.var = torch_bn.running_var.detach().numpy().reshape(my_bn.var.shape)
+                    my_bn.running_mean = torch_bn.running_mean.detach().numpy().reshape(my_bn.running_mean.shape)
+                    my_bn.running_var = torch_bn.running_var.detach().numpy().reshape(my_bn.running_var.shape)
                     torch_bn.momentum = 1
 
 
@@ -282,8 +282,8 @@ class ResNet(Module):
 
                     my_block.bn_for_residual.gamma = torch_block.bn_for_residual.weight.detach().numpy().reshape(my_block.bn_for_residual.gamma.shape)
                     my_block.bn_for_residual.beta = torch_block.bn_for_residual.bias.detach().numpy().reshape(my_block.bn_for_residual.beta.shape)
-                    my_block.bn_for_residual.mean = torch_block.bn_for_residual.running_mean.detach().numpy().reshape(my_block.bn_for_residual.mean.shape)
-                    my_block.bn_for_residual.var = torch_block.bn_for_residual.running_var.detach().numpy().reshape(my_block.bn_for_residual.var.shape)
+                    my_block.bn_for_residual.running_mean = torch_block.bn_for_residual.running_mean.detach().numpy().reshape(my_block.bn_for_residual.running_mean.shape)
+                    my_block.bn_for_residual.running_var = torch_block.bn_for_residual.running_var.detach().numpy().reshape(my_block.bn_for_residual.running_var.shape)
                     torch_block.bn_for_residual.momentum = 1
                 
                 if torch_block.conv_to_match_dimensions:

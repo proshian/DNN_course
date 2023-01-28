@@ -81,6 +81,10 @@ test:
 ![numpy resnet101 epoch metrics](./images_for_readme/numpy_resnet101_epoch_metrics.png)
 
 
+Реализация свертки, основанной на матричном умножении, ускорило обучение resnet101 на MNIST более чем в 33 раза! На изоборажении ниже видно, что ранее одна эпоха треборвала более 114 часов, теперь около 3 часов.
+
+![performance comparison](./images_for_readme/performance.png)
+
 ## Реализация resnet-101 на torch и сравнение обучения с использованием Adam и AdaBound
 ### Описание разработанной системы (алгоритмы, принципы работы, архитектура)
 Весь код находится в директории [./pytorch_implementations](./pytorch_implementations).
