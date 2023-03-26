@@ -1,7 +1,15 @@
+import sys
+import  os
+# add project root directory to python path
+sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
+
+
+
 from typing import List
 
 import numpy as np
-from NumpyNN.NN_np import (
+
+from numpy_nn.modules.np_nn import (
     # Conv2dWithLoops as Conv2d,
     Module,
     Conv2d,
@@ -10,6 +18,7 @@ from NumpyNN.NN_np import (
     MaxPool2d,
     FullyConnectedLayer,
     TrainableLayer,
+    BatchNormalization2d,
     Flatten,
 )
 
@@ -48,6 +57,11 @@ class Bottleneck(Module):
         self.bottleneck_depth = bottleneck_depth
         self.stride_for_downsampling = stride_for_downsampling
 
+
+        self.bn1 = BatchNormalization2d(bottleneck_depth)
+        self.bn2 = BatchNormalization2d(bottleneck_depth)
+        self.bn3 = BatchNormalization2d(bottleneck_depth * self.expansion)
+
         self.conv1 = conv1x1(in_channels, bottleneck_depth, stride_for_downsampling)
         self.conv2 = conv3x3(bottleneck_depth, bottleneck_depth)
         self.conv3 = conv1x1(bottleneck_depth, bottleneck_depth * self.expansion)
@@ -66,29 +80,35 @@ class Bottleneck(Module):
         self.conv_to_match_dimensions = None
         if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
             self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
+            self.bn_for_residual = BatchNormalization2d(bottleneck_depth * self.expansion)
         
         # ! Need to do this in a better way.
-        self.trainable_layers = [self.conv1, self.conv2, self.conv3]
+        self.trainable_layers = [self.conv1, self.conv2, self.conv3, self.bn1, self.bn2, self.bn3]
         if self.conv_to_match_dimensions is not None:
             self.trainable_layers.append(self.conv_to_match_dimensions)
+            self.trainable_layers.append(self.bn_for_residual)
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
         self.input_ = input_
         
         if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions.forward(input_)
+            identity = self.bn_for_residual.forward(identity)
         else:
             identity = input_
 
         # The layers from conv1 to conv3 are main path.
         #! Maybe make them members of a sequential network object?
         out = self.conv1.forward(input_)
+        out = self.bn1.forward(out)
         out = self.relu1.forward(out)
 
         out = self.conv2.forward(out)
+        out = self.bn2.forward(out)
         out = self.relu2.forward(out)
 
         out = self.conv3.forward(out)
+        out = self.bn3.forward(out)
 
         out += identity
         out = self.relu3.forward(out)
@@ -101,10 +121,11 @@ class Bottleneck(Module):
         
         # The layers from conv1 to conv3 are main path.
         #! Maybe make them members of a sequential network object?
-        for layer in ([self.conv3, self.relu2, self.conv2, self.relu1, self.conv1]):
+        for layer in ([self.bn3, self.conv3, self.relu2, self.bn2, self.conv2, self.relu1, self.bn1, self.conv1]):
             main_path_output_gradient = layer.backward(main_path_output_gradient)
         
         if self.conv_to_match_dimensions is not None:
+            identity_output_gradient = self.bn_for_residual.backward(identity_output_gradient)
             identity_output_gradient = self.conv_to_match_dimensions.backward(identity_output_gradient)
         
         return main_path_output_gradient + identity_output_gradient
@@ -137,6 +158,7 @@ class ResNet(Module):
         self.conv1 = Conv2d(
             img_channels, self.cur_block_in_channels,
             kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = BatchNormalization2d(self.cur_block_in_channels)
         self.maxpool = MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.relu = ReLULayer()
         self.conv2_x = self._make_blocks(block_nums[0], 64, False)
@@ -149,7 +171,7 @@ class ResNet(Module):
 
         # ! Need to do this in a better way.
         nn_modules = [
-            self.conv1, self.conv2_x, self.conv3_x,
+            self.conv1, self.bn1, self.conv2_x, self.conv3_x,
             self.conv4_x, self.conv5_x, self.fc
         ]
 
@@ -194,6 +216,7 @@ class ResNet(Module):
     
     def forward(self, input_: np.ndarray) -> np.ndarray:
         out = self.conv1.forward(input_)
+        out = self.bn1.forward(out)
         out = self.relu.forward(out)
         out = self.maxpool.forward(out)
         out = self.conv2_x.forward(out)
@@ -215,6 +238,7 @@ class ResNet(Module):
         out = self.conv2_x.backward(out)
         out = self.maxpool.backward(out)
         out = self.relu.backward(out)
+        out = self.bn1.backward(out)
         out = self.conv1.backward(out)
         return out
     
@@ -247,8 +271,28 @@ class ResNet(Module):
                 for my_conv, torch_conv in conv_layer_pairs:
                     my_conv.weights = torch_conv.weight.detach().numpy().reshape(my_conv.weights.shape)
 
+
+                bn_pairs = [
+                    (my_block.bn1, torch_block.bn1),
+                    (my_block.bn2, torch_block.bn2),
+                    (my_block.bn3, torch_block.bn3)]
+
+                for my_bn, torch_bn in bn_pairs:
+                    my_bn.gamma = torch_bn.weight.detach().numpy().reshape(my_bn.gamma.shape)
+                    my_bn.beta = torch_bn.bias.detach().numpy().reshape(my_bn.beta.shape)
+                    my_bn.running_mean = torch_bn.running_mean.detach().numpy().reshape(my_bn.running_mean.shape)
+                    my_bn.running_var = torch_bn.running_var.detach().numpy().reshape(my_bn.running_var.shape)
+                    my_bn.momentum = torch_bn.momentum
+
+
                 if my_block.conv_to_match_dimensions:
                     my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy().reshape(my_block.conv_to_match_dimensions.weights.shape)
+
+                    my_block.bn_for_residual.gamma = torch_block.bn_for_residual.weight.detach().numpy().reshape(my_block.bn_for_residual.gamma.shape)
+                    my_block.bn_for_residual.beta = torch_block.bn_for_residual.bias.detach().numpy().reshape(my_block.bn_for_residual.beta.shape)
+                    my_block.bn_for_residual.running_mean = torch_block.bn_for_residual.running_mean.detach().numpy().reshape(my_block.bn_for_residual.running_mean.shape)
+                    my_block.bn_for_residual.running_var = torch_block.bn_for_residual.running_var.detach().numpy().reshape(my_block.bn_for_residual.running_var.shape)
+                    my_block.bn_for_residual.momentum = torch_block.bn_for_residual.momentum
                 
                 if torch_block.conv_to_match_dimensions:
                     if not my_block.conv_to_match_dimensions:
