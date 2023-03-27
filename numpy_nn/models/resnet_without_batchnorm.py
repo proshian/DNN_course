@@ -1,15 +1,8 @@
-import sys
-import  os
-# add project root directory to python path
-sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
-
-
-
 from typing import List
 
 import numpy as np
 
-from numpy_nn.modules.np_nn import (
+from ..modules.np_nn import (
     # Conv2dWithLoops as Conv2d,
     Module,
     Conv2d,

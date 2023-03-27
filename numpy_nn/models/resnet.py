@@ -1,15 +1,8 @@
-import sys
-import  os
-# add project root directory to python path
-sys.path.append(os.path.dirname(os.path.dirname(sys.path[0])))
-
-
-
 from typing import List
 
 import numpy as np
 
-from numpy_nn.modules.np_nn import (
+from ..modules.np_nn import (
     # Conv2dWithLoops as Conv2d,
     Module,
     Conv2d,
@@ -52,7 +45,7 @@ class Bottleneck(Module):
     # more than for than for other convolutions. 
     expansion: int = 4
 
-    def __init__(self, in_channels: int, bottleneck_depth: int, stride_for_downsampling: int = 1):
+    def __init__(self, in_channels: int, bottleneck_depth: int, stride_for_downsampling: int = 1) -> None:
         self.in_channels = in_channels
         self.bottleneck_depth = bottleneck_depth
         self.stride_for_downsampling = stride_for_downsampling
@@ -132,6 +125,11 @@ class Bottleneck(Module):
 
     def get_trainable_layers(self) -> List[TrainableLayer]:
         return self.trainable_layers
+    
+    # ! TODO
+    # def clone_weights_from_torch(self, torch_bn) -> None:
+        
+
     
 
 class ResNet(Module):
@@ -253,6 +251,12 @@ class ResNet(Module):
             torch_model (nn.Module): A PyTorch model.
         """
         self.conv1.weights = torch_resnet.conv1.weight.detach().numpy()
+
+        self.bn1.gamma = torch_resnet.bn1.weight.detach().numpy().reshape(my_bn.gamma.shape)
+        self.bn1.beta = torch_resnet.bn1.bias.detach().numpy().reshape(my_bn.beta.shape)
+        self.bn1.running_mean = torch_resnet.bn1.running_mean.detach().numpy().reshape(my_bn.running_mean.shape)
+        self.bn1.running_var = torch_resnet.bn1.running_var.detach().numpy().reshape(my_bn.running_var.shape)
+        self.bn1.momentum = torch_resnet.bn1.momentum
 
         my_block_collections = [self.conv2_x, self.conv3_x, self.conv4_x, self.conv5_x]
         torch_block_collections = [torch_resnet.conv2_x, torch_resnet.conv3_x, torch_resnet.conv4_x, torch_resnet.conv5_x]
