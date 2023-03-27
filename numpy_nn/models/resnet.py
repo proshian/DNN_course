@@ -252,10 +252,10 @@ class ResNet(Module):
         """
         self.conv1.weights = torch_resnet.conv1.weight.detach().numpy()
 
-        self.bn1.gamma = torch_resnet.bn1.weight.detach().numpy().reshape(my_bn.gamma.shape)
-        self.bn1.beta = torch_resnet.bn1.bias.detach().numpy().reshape(my_bn.beta.shape)
-        self.bn1.running_mean = torch_resnet.bn1.running_mean.detach().numpy().reshape(my_bn.running_mean.shape)
-        self.bn1.running_var = torch_resnet.bn1.running_var.detach().numpy().reshape(my_bn.running_var.shape)
+        self.bn1.gamma = torch_resnet.bn1.weight.detach().numpy().reshape(self.bn1.gamma.shape)
+        self.bn1.beta = torch_resnet.bn1.bias.detach().numpy().reshape(self.bn1.beta.shape)
+        self.bn1.running_mean = torch_resnet.bn1.running_mean.detach().numpy().reshape(self.bn1.running_mean.shape)
+        self.bn1.running_var = torch_resnet.bn1.running_var.detach().numpy().reshape(self.bn1.running_var.shape)
         self.bn1.momentum = torch_resnet.bn1.momentum
 
         my_block_collections = [self.conv2_x, self.conv3_x, self.conv4_x, self.conv5_x]

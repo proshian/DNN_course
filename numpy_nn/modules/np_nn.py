@@ -468,6 +468,12 @@ class BatchNormalization2d(TrainableLayer):
             + (1 - self.momentum) * self.running_var
         
 
+        # ! В официальном торче батчнормализация сделана на cpp. Код вот:
+        # https://github.com/pytorch/pytorch/blob/420b37f3c67950ed93cd8aa7a12e673fcfc5567b/aten/src/ATen/native/Normalization.cpp#L61-L126
+        # Однако, есть реализация, сделанная руками, которая по идее не должна отличаться. Она ниже.
+        # Там же и тестирующий метод, который позвлит убедиться, стоит ли доверять этой имплементации.
+        # https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
+
         # Убрал, так как, насколько я понимаю, pytorch реализация не использует bias correction
         # ! возможно, нужно делать операции ниже не implace
         # # bias correction
@@ -476,7 +482,6 @@ class BatchNormalization2d(TrainableLayer):
         # self.num_batches_trained_on += 1
 
     def forward(self, input_: np.ndarray) -> np.ndarray:
-        print("test")
         self.input_ = input_
         # In the training phase, we use the mean and std of the current batch
         # In the testing phase, we use the exponential moving average
