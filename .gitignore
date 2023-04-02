@@ -131,3 +131,5 @@ ui-tests/playwright-report
 .jupyter_ystore.db
 
 *.h5
+
+*.pickle

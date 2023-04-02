@@ -489,7 +489,7 @@ class BatchNormalization2d(TrainableLayer):
         if self.training:
             self.mean = input_.mean(axis = (0, 2, 3), keepdims = True)
 
-            self.var = input_.var(axis = (0, 2, 3), keepdims = True, ddof = 0) 
+            self.var = input_.var(axis = (0, 2, 3), keepdims = True, ddof = 0)
             self.update_running_mean_and_var()
         else:
             self.mean = self.running_mean
@@ -505,10 +505,14 @@ class BatchNormalization2d(TrainableLayer):
         # For testing purposes only (to compare with torch in eval)
         if not self.training:
             return output_gradient
-        
 
-        self.beta_gradient = np.sum(output_gradient, axis = (0, 2, 3), keepdims=True)
-        self.gamma_gradient = np.sum(output_gradient * self.norm_input, axis = (0, 2, 3), keepdims=True)
+        self.beta_gradient = np.sum(
+            output_gradient, axis = (0, 2, 3), keepdims=True)
+        
+        self.gamma_gradient = np.sum(
+            output_gradient * self.norm_input,
+            axis = (0, 2, 3),
+            keepdims=True)
 
         norm_input_gradient = output_gradient * self.gamma
 
