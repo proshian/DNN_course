@@ -464,7 +464,11 @@ class BatchNormalization2d(TrainableLayer):
         self.running_mean = self.momentum * self.mean\
             + (1 - self.momentum) * self.running_mean
         
-        self.running_var = self.momentum * self.var\
+        # afaik, pytorch uses unbiased running variance
+        # May be it's because running_mean is averaging over a relatively
+        # small number of elements and we need Bessel's correction.
+        n = np.prod(self.input_.shape)/self.n_channels
+        self.running_var = self.momentum * self.var * n / (n-1)\
             + (1 - self.momentum) * self.running_var
         
 
@@ -488,7 +492,6 @@ class BatchNormalization2d(TrainableLayer):
         # of the mean and std across all batches
         if self.training:
             self.mean = input_.mean(axis = (0, 2, 3), keepdims = True)
-
             self.var = input_.var(axis = (0, 2, 3), keepdims = True, ddof = 0)
             self.update_running_mean_and_var()
         else:

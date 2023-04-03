@@ -1,29 +1,27 @@
+# README не обновлено и не отражает текущую ситуацию
+
+
 # TODO
-* Add a generic testing function that takes a secuence of my modules and a sequence of torch modules, runs forward and backward and checks gradients
-* Определиться со структурой документа.
-    * Если изменения от 27.03.23 в силе, решить как сделать моули доступными друг другу (например, сделать скрипту resnet.py package np_nn доступным). Варианты:
-        * Сделать numpy_nn и pytorch_nn инсталлируемыми модулями
-        * Добавить везде sys.path.append
-        * Запускать скриаты всегда передавая им путь до корневого директория как парметр коммандной строки
+* Make test functions for batchnorm and loss
+    * in case of batchnorm it is vital to call forward and backward several times
+    * if we rewrite test_layer so that it takes modules istead of module constructoras and parameters we can create a batchnorm layer and call test_layer on same instances multiple times
+* Починить батч-нормализацию
+* add loss test funciton
+* Check if test_stack_of_layers works
+
+* Update the readme
+    * choose readme structure
+    * пояснить, что numpy_nn и torch_nn должны рассматриваться как библиотеки
+    * пути до файлов с кодом должны быть актуальными
+    * translate README to English
+    * добавить раздел поясняющий как устроены тесты
 
 * Добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
 
 * Убедиться, что ноутбуки для обучения моделей как pytorch, так и numpy работают
-* Починить батч-нормализацию
 * Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 
 
-* Обнвить readme:
-    * пути до файлов с кодом должны быть актуальными
 
-
-* Убедиться в разумности копи-пасты в тестах
-
-* Перевести все README на английский
-
-* добавить описание про копирование весов
-
-
-# README не обновлено и не отражает текущую ситуацию
 # Реализация ResNet-101, Adam, AbaBound (pytorch vs numpy)
 
 <!-- 
