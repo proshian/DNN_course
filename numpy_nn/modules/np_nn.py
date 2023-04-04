@@ -504,11 +504,6 @@ class BatchNormalization2d(TrainableLayer):
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         # The formulas are taken from: https://neerc.ifmo.ru/wiki/index.php?title=Batch-normalization
-
-        # For testing purposes only (to compare with torch in eval)
-        if not self.training:
-            return output_gradient
-
         self.beta_gradient = np.sum(
             output_gradient, axis = (0, 2, 3), keepdims=True)
         
@@ -523,8 +518,9 @@ class BatchNormalization2d(TrainableLayer):
         sum_ = np.sum(prod, axis = (0, 2, 3), keepdims=True)
         var_gradient = -0.5 * np.power(self.var + self.eps, -1.5) * sum_
 
-        batch_size, n_channels, height, width = self.input_.shape
-        bhw = batch_size * height * width
+        # bhw stands for batch_size * height * width. Will be renamed to num_elems
+        bhw = np.prod(self.input_.shape)/self.n_channels
+
         std_inv = 1.0 / np.sqrt(self.var + self.eps)
 
         mean_gradient = - std_inv * np.sum(norm_input_gradient, axis = (0, 2, 3), keepdims=True) + \
@@ -535,6 +531,18 @@ class BatchNormalization2d(TrainableLayer):
             mean_gradient / bhw
 
         return input_gradient
+    
+    # def backward_alternative(self, output_gradient: np.ndarray) -> np.ndarray:
+    #     B = np.prod(self.input_.shape)/self.n_channels
+        
+    #     dL_dxi_hat = output_gradient * self.gamma
+    #     dL_dvar = np.sum((-0.5 * dL_dxi_hat * (self.input_ - self.mean)), axis = (0, 2, 3), keepdims=True)  * ((self.var + self.eps) ** -1.5) # edit
+    #     dL_davg = np.sum(-1.0 / np.sqrt(self.var + self.eps) * dL_dxi_hat, axis = (0, 2, 3), keepdims=True) + np.sum(dL_dvar * -2.0 * (self.input_ - self.mean), axis = (0, 2, 3), keepdims=True) / B #edit
+        
+    #     dL_dxi = (dL_dxi_hat / np.sqrt(self.var + self.eps)) + (2.0 * dL_dvar * (self.input_ -self.mean) / B) + (dL_davg / B) # dL_dxi_hat / sqrt()
+    #     self.gamma_gradient = np.sum(output_gradient * self.norm_input, axis = (0, 2, 3), keepdims=True) # edit
+    #     self.beta_gradient = np.sum(output_gradient, axis = (0, 2, 3), keepdims=True)
+    #     return dL_dxi
         
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
         gamma_id = f'g{self.id}'
