@@ -2,10 +2,7 @@
 
 
 # TODO
-* Make test functions for batchnorm and loss
-    * in case of batchnorm it is vital to call forward and backward several times
-    * if we rewrite test_layer so that it takes modules istead of module constructoras and parameters we can create a batchnorm layer and call test_layer on same instances multiple times
-* Починить батч-нормализацию
+* Find out why my resnet101 weights and torch resnet101 weights don't match up
 * add loss test funciton
 * Check if test_stack_of_layers works
 
@@ -16,9 +13,9 @@
     * translate README to English
     * добавить раздел поясняющий как устроены тесты
 
-* Добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
+* Мб обавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
 
-* Убедиться, что ноутбуки для обучения моделей как pytorch, так и numpy работают
+* Убедиться, что блокноты для обучения моделей как pytorch, так и numpy работают
 * Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 
 
 
