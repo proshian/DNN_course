@@ -38,11 +38,8 @@ class Bottleneck(nn.Module):
     expansion: int = 4
 
     def __init__(
-        self,
-        in_channels: int,
-        bottleneck_depth: int,
-        stride_for_downsampling: int = 1,
-    ) -> None:
+            self, in_channels: int, bottleneck_depth: int,
+            stride_for_downsampling: int = 1) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.bottleneck_depth = bottleneck_depth

@@ -45,7 +45,9 @@ class Bottleneck(Module):
     # more than for than for other convolutions. 
     expansion: int = 4
 
-    def __init__(self, in_channels: int, bottleneck_depth: int, stride_for_downsampling: int = 1) -> None:
+    def __init__(
+            self, in_channels: int, bottleneck_depth: int,
+            stride_for_downsampling: int = 1) -> None:
         self.in_channels = in_channels
         self.bottleneck_depth = bottleneck_depth
         self.stride_for_downsampling = stride_for_downsampling
@@ -273,7 +275,7 @@ class ResNet(Module):
                     (my_block.conv3, torch_block.conv3)]
 
                 for my_conv, torch_conv in conv_layer_pairs:
-                    my_conv.weights = torch_conv.weight.detach().numpy().reshape(my_conv.weights.shape)
+                    my_conv.weights = torch_conv.weight.detach().numpy() #.reshape(my_conv.weights.shape)
 
 
                 bn_pairs = [
@@ -290,7 +292,7 @@ class ResNet(Module):
 
 
                 if my_block.conv_to_match_dimensions:
-                    my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy().reshape(my_block.conv_to_match_dimensions.weights.shape)
+                    my_block.conv_to_match_dimensions.weights = torch_block.conv_to_match_dimensions.weight.detach().numpy()# .reshape(my_block.conv_to_match_dimensions.weights.shape)
 
                     my_block.bn_for_residual.gamma = torch_block.bn_for_residual.weight.detach().numpy().reshape(my_block.bn_for_residual.gamma.shape)
                     my_block.bn_for_residual.beta = torch_block.bn_for_residual.bias.detach().numpy().reshape(my_block.bn_for_residual.beta.shape)

@@ -2,7 +2,7 @@
 
 
 # TODO
-* Find out why my resnet101 weights and torch resnet101 weights don't match up
+* Check if all gradients (partial derivatives) match in torch and numpy implementations
 * add loss test funciton
 * Check if test_stack_of_layers works
 
@@ -13,7 +13,7 @@
     * translate README to English
     * добавить раздел поясняющий как устроены тесты
 
-* Мб обавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
+* Мб добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
 
 * Убедиться, что блокноты для обучения моделей как pytorch, так и numpy работают
 * Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 
