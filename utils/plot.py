@@ -1,19 +1,19 @@
-from typing import List
+from typing import List, Tuple, Dict
 import matplotlib.pyplot as plt
 
 
-def get_phases_and_metric_names_from_hirtory_list(history_list: List[dict[str, List[float]]]) -> tuple[List[str], List[str]]:
+def get_phases_and_metric_names_from_hirtory_list(history_list: List[Dict[str, List[float]]]) -> Tuple[List[str], List[str]]:
     history1 = history_list[0]
     phases = list(history1.keys())
     metric_names = list(history1[phases[0]].keys())
     return phases, metric_names
 
 
-def get_epoches_num_from_history(history: dict[str, List[float]], phases: List[str], metric_names: List[str]) -> int:
+def get_epoches_num_from_history(history: Dict[str, List[float]], phases: List[str], metric_names: List[str]) -> int:
     return len(history[phases[0]][metric_names[0]])
 
 
-def plot_history(history_list: List[dict[str, List[float]]],
+def plot_history(history_list: List[Dict[str, List[float]]],
                  history_names: List[str] = None,
                  omit_first_epoch: bool = False,
                  force_legend: bool = False,
