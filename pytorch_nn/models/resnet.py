@@ -154,7 +154,7 @@ class ResNet(nn.Module):
         block = Bottleneck(self.cur_block_in_channels, bottleneck_depth, stride_for_downsampling)
         self.cur_block_in_channels = bottleneck_depth * block.expansion
         blocks.append(block)
-        for i in range(1, n_blocks):
+        for _ in range(1, n_blocks):
             block = Bottleneck(self.cur_block_in_channels, bottleneck_depth)
             blocks.append(block)
         return nn.Sequential(*blocks)
