@@ -378,14 +378,20 @@ class Conv2d(TrainableLayer):
 
 class MaxPool2d(Module):
     # ! May be use inheritance or a global function to perform padding
-    def __init__(self, kernel_size: int, stride: int, padding: int = 0):
+    def __init__(self, kernel_size: int, stride: int, padding: int = 0, use_neg_inf_for_padding: bool = True):
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
+        self._use_neg_inf_for_padding = use_neg_inf_for_padding
     
     def _get_padded_input(self, input_: np.ndarray) -> np.ndarray:
         batch_size, n_channels, height, width = input_.shape
-        padded_input = np.zeros((batch_size, n_channels, height + 2*self.padding, width + 2*self.padding))
+        padded_shape = (batch_size, n_channels, height + 2*self.padding, width + 2*self.padding)
+
+        if self._use_neg_inf_for_padding:
+            padded_input = np.full(padded_shape, -np.inf)  #.astype(input_.dtype)
+        else:
+            padded_input = np.zeros(padded_shape)  #.astype(input_.dtype)
         padded_input[:, :, self.padding:self.padding+height, self.padding:self.padding+width] = input_
         return padded_input
 
@@ -582,8 +588,8 @@ class ReLULayer(ActivationLayer):
 class SigmoidLayer(ActivationLayer):
     def forward(self, input_: np.ndarray) -> np.ndarray:
         # clip is used to avoid overflow
-        self.output = 1 / (1 + np.exp(-np.clip(input_, 1e-8, 1e2)))
-        # self.output = 1 / (1 + np.exp(-input_))
+        # self.output = 1 / (1 + np.exp(-np.clip(input_, 1e-8, 1e4)))
+        self.output = 1 / (1 + np.exp(-input_))
         return self.output
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
