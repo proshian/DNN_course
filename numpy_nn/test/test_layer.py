@@ -19,30 +19,51 @@ from numpy_nn.modules.np_nn import (
 )
 
 
-def test_module(my_module: Module, torch_module: torch.nn.Module,
-                input_shape: Tuple[int, ...], output_shape: Tuple[int, ...],
-                atol: float = 1e-5, random_sampler: Callable = np.random.rand,
-                skip_parameter_copying = False, print_tensors = False) -> None:
+def copy_trainable_parameters(my_module: Module, torch_module: torch.nn.Module) -> None:
+    if isinstance(my_module, FullyConnectedLayer):
+        my_module.weights = torch_module.weight.detach().numpy().T
+        my_module.bias = torch_module.bias.detach().numpy().reshape(-1, 1).T
+    elif isinstance(my_module, BatchNormalization2d):
+        n_channels = my_module.n_channels
+        my_module.gamma = torch_module.weight.detach().numpy().reshape(1, n_channels, 1, 1)
+        my_module.beta = torch_module.bias.detach().numpy().reshape(1, n_channels, 1, 1)
+        my_module.running_mean = torch_module.running_mean.detach().numpy().reshape(1, n_channels, 1, 1)
+        my_module.running_var = torch_module.running_var.detach().numpy().reshape(1, n_channels, 1, 1)
+    else:
+        my_module.weights = torch_module.weight.detach().numpy()
+        if my_module.bias is not None:
+            my_module.bias = torch_module.bias.detach().numpy()
+
+
+def test_module(my_module: Module,
+                torch_module: torch.nn.Module,
+                input_shape: Tuple[int, ...],
+                output_shape: Tuple[int, ...],
+                atol: float = 1e-5,
+                random_sampler: Callable = np.random.rand,
+                skip_parameter_copying: bool = False,
+                print_tensors: bool = False,
+                print_results: bool = False) -> None:
     """
     Compares the output and gradients of a numpy layer and a torch layer
+
+    Args:
+        my_module: neural network layer implemented in numpy.
+        torch_module: neural network layer implemented in torch.
+        input_shape: shape of the input tensor.
+        output_shape: shape of the output tensor. It's used to generate
+            a random tensor representing partial derivative of the loss
+            function with respect to the output of the layer.
+        atol: absolute tolerance for comparing
+            numpy and torch tensors (used in np.allclose).
+        random_sampler: function that generates random tensors of the given shape.
+        skip_parameter_copying: if True, the weights and biases will be held intact.
+            By default, weights and biases are copied from torch_module to my_module.
     """    
     # copy weights from torch_module to my_module
     # if the numpy layer is trainable
     if not skip_parameter_copying and isinstance(my_module, TrainableLayer):
-        if isinstance(my_module, FullyConnectedLayer):
-            my_module.weights = torch_module.weight.detach().numpy().T
-            my_module.bias = torch_module.bias.detach().numpy().reshape(-1, 1).T
-        elif isinstance(my_module, BatchNormalization2d):
-            n_channels = input_shape[1]
-            my_module.gamma = torch_module.weight.detach().numpy().reshape(1, n_channels, 1, 1)
-            my_module.beta = torch_module.bias.detach().numpy().reshape(1, n_channels, 1, 1)
-            my_module.running_mean = torch_module.running_mean.detach().numpy().reshape(1, n_channels, 1, 1)
-            my_module.running_var = torch_module.running_var.detach().numpy().reshape(1, n_channels, 1, 1)
-        else:
-            my_module.weights = torch_module.weight.detach().numpy()
-            if my_module.bias is not None:
-                my_module.bias = torch_module.bias.detach().numpy()
-
+        copy_trainable_parameters(my_module, torch_module)
 
     input_np = random_sampler(*input_shape).astype(np.float32)
     input_torch = torch.from_numpy(input_np)
@@ -56,7 +77,8 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
         print("my and torch outputs:")
         print(output_np.flatten(), output_torch.detach().numpy().flatten())
     assert np.allclose(output_np, output_torch.detach().numpy(), atol=atol), "Outputs are not equal"
-    print("Outputs are equal")
+    if print_results:
+        print("Outputs are equal")
 
     output_grad_np = random_sampler(*output_shape)
     output_grad_torch = torch.from_numpy(output_grad_np)
@@ -69,7 +91,9 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
         print("my and torch input gradients:")
         print(input_grad_np.flatten(), input_grad_torch.flatten())
     assert np.allclose(input_grad_np, input_grad_torch, atol=atol), "Input gradients are not equal"
-    print("Input gradients are equal")
+    if print_results:
+        print("Input gradients are equal")
+
 
     if not isinstance(my_module, TrainableLayer):
         return
@@ -82,7 +106,6 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
         bias_grad_np = my_module.bias_gradient
         bias_grad_torch = torch_module.bias.grad.detach().numpy().reshape(-1, 1).T
     elif isinstance(my_module, BatchNormalization2d):
-        n_channels = input_shape[1]
         weight_grad_np = my_module.gamma_gradient.flatten()
         weight_grad_torch = torch_module.weight.grad.detach().numpy()
         bias_grad_np = my_module.beta_gradient.flatten()
@@ -94,7 +117,8 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
         running_mean_close = np.allclose(
             my_module.running_mean.flatten(), torch_module.running_mean.detach().numpy().flatten(), atol=atol)
         assert running_mean_close, "Running mean is not equal"
-        print("Running means are equal")
+        if print_results:
+            print("Running means are equal")
 
         if print_tensors:
             print("my and torch running vars:")
@@ -102,7 +126,8 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
         running_var_close = np.allclose(
             my_module.running_var.flatten(), torch_module.running_var.detach().numpy().flatten(), atol=atol)
         assert running_var_close, "Running var is not equal"
-        print("Running vars are equal")
+        if print_results:
+            print("Running vars are equal")
             
     else:
         weight_grad_np = my_module.weights_gradient
@@ -118,7 +143,8 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
         print(weight_grad_np.flatten(), weight_grad_torch.flatten())
         
     assert weight_grads_close, "Weight gradients are not equal"
-    print("Weight gradients are equal")
+    if print_results:
+        print("Weight gradients are equal")
 
     if isinstance(my_module, BatchNormalization2d) or my_module.bias is not None:
         if print_tensors:
@@ -126,7 +152,8 @@ def test_module(my_module: Module, torch_module: torch.nn.Module,
             print(bias_grad_np.flatten(), bias_grad_torch.flatten())
 
         assert np.allclose(bias_grad_np, bias_grad_torch, atol=atol), "Bias gradients are not equal"
-        print("Bias gradients are equal")
+        if print_results:
+            print("Bias gradients are equal")
 
 
 
