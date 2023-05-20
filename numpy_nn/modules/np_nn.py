@@ -435,6 +435,23 @@ class MaxPool2d(Module):
         return input_gradient[:, :, self.padding:self.padding+height, self.padding:self.padding+width]
 
 
+class GlobalAveragePooling2D:
+    def __init__(self):
+        self.input_shape = None
+
+    def forward(self, input_):
+        self.input_shape = input_.shape
+        return np.mean(input_, axis=(2, 3))
+
+    # ! Add backward and write a test for it
+    # def backward(self, output_gradient):
+    #     _, _, height, width = self.input_shape
+    #     # Calculate the gradient for each element in the input array
+    #     grad_input = np.ones(self.input_shape) * output_gradient[:, :, np.newaxis, np.newaxis]
+    #     grad_input /= (height * width)  # Divide by the number of elements pooled
+    #     return grad_input
+    
+
 class BatchNormalization2d(TrainableLayer):
     """
     Args:
@@ -538,7 +555,7 @@ class BatchNormalization2d(TrainableLayer):
 
         return input_gradient
     
-    # def backward_alternative(self, output_gradient: np.ndarray) -> np.ndarray:
+    # def backward(self, output_gradient: np.ndarray) -> np.ndarray:
     #     B = np.prod(self.input_.shape)/self.n_channels
         
     #     dL_dxi_hat = output_gradient * self.gamma

@@ -7,8 +7,7 @@
 
 ![Здесь должно быть изображение с сверткой в виде матричного преобразования](../../images_for_readme/convolution_as_a_matrix_multiplication.png)
 <p align = "center">
-<i>Свертка как произведение матриц.</i>
+    <i>Свертка как произведение матриц.</i>
 </p>
-<p align = "center">
-Источник изображения: https://www.researchgate.net/figure/Representing-convolution-operation-as-matrix-multiplication_fig1_317967088
-</p>
+
+Источник изображения: [Molchanov, V. V., et al. "Pedestrian detection in video surveillance using fully convolutional YOLO neural network." Automated visual inspection and machine vision II. Vol. 10334. SPIE, 2017.](https://www.researchgate.net/figure/Representing-convolution-operation-as-matrix-multiplication_fig1_317967088)
