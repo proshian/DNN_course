@@ -442,14 +442,11 @@ class GlobalAveragePooling2D:
     def forward(self, input_):
         self.input_shape = input_.shape
         return np.mean(input_, axis=(2, 3))
-
-    # ! Add backward and write a test for it
-    # def backward(self, output_gradient):
-    #     _, _, height, width = self.input_shape
-    #     # Calculate the gradient for each element in the input array
-    #     grad_input = np.ones(self.input_shape) * output_gradient[:, :, np.newaxis, np.newaxis]
-    #     grad_input /= (height * width)  # Divide by the number of elements pooled
-    #     return grad_input
+    
+    def backward(self, d_J_d_out):
+        d_out_d_in = np.ones(self.input_shape) / np.prod(self.input_shape[2:])
+        d_J_d_out = d_J_d_out[:, :, np.newaxis, np.newaxis]
+        return d_out_d_in * d_J_d_out
     
 
 class BatchNormalization2d(TrainableLayer):
