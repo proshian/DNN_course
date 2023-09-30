@@ -12,6 +12,7 @@ from ..modules.np_nn import (
     FullyConnectedLayer,
     TrainableLayer,
     BatchNormalization2d,
+    GlobalAveragePooling2D,
     Flatten,
 )
 
@@ -165,7 +166,7 @@ class ResNet(Module):
         self.conv3_x = self._make_blocks(block_nums[1], 128)
         self.conv4_x = self._make_blocks(block_nums[2], 256)
         self.conv5_x = self._make_blocks(block_nums[3], 512)
-        # ! add adaptive avg pool
+        self.avgpool = GlobalAveragePooling2D()
         # ! Maybe add reshape
         self.fc = FullyConnectedLayer(512 * block.expansion, n_classes)
 
@@ -223,15 +224,13 @@ class ResNet(Module):
         out = self.conv3_x.forward(out)
         out = self.conv4_x.forward(out)
         out = self.conv5_x.forward(out)
-        out = out.reshape(out.shape[0], -1) # ! temporary solution
+        out = self.avgpool.forward(out)
         out = self.fc.forward(out)
         return out
     
     def backward(self, output_gradient: np.ndarray) -> np.ndarray:
         out = self.fc.backward(output_gradient)
-        # ! Temporary solution. 2048 = number of channels after
-        # last block of conv5_3 = 512 * block.expansion
-        out = out.reshape(out.shape[0], 2048, 1, 1)
+        out = self.avgpool.backward(out)
         out = self.conv5_x.backward(out)
         out = self.conv4_x.backward(out)
         out = self.conv3_x.backward(out)
