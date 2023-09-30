@@ -1,5 +1,7 @@
 # ResNet-101 numpy
 
+**Ветка adabound-and-batchnorm, в которой ведется работа над добавлением batchnorm в resnet, a также провеены эксперименты, сравнивающие adabound и adam на примере задачи Stanford cars**
+
 ResNet-101 на numpy без других библиотек и апробация на MNIST
 
 Также была реализована ResNet-101 на torch. Обучение pytorch имплементации произведено на датасете [Stanford Cars](http://ai.stanford.edu/~jkrause/cars/car_dataset.html). При этом использовались два оптимизатора Adam и [Adabound](https://arxiv.org/abs/1902.09843v1) с целью их сравнения.
