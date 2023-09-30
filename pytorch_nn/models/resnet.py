@@ -38,16 +38,15 @@ class Bottleneck(nn.Module):
     expansion: int = 4
 
     def __init__(
-            self, in_channels: int, bottleneck_depth: int,
-            stride_for_downsampling: int = 1) -> None:
+        self,
+        in_channels: int,
+        bottleneck_depth: int,
+        stride_for_downsampling: int = 1,
+    ) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.bottleneck_depth = bottleneck_depth
         self.stride_for_downsampling = stride_for_downsampling
-
-        self.bn1 = nn.BatchNorm2d(bottleneck_depth)
-        self.bn2 = nn.BatchNorm2d(bottleneck_depth)
-        self.bn3 = nn.BatchNorm2d(bottleneck_depth * self.expansion)
 
         self.conv1 = conv1x1(in_channels, bottleneck_depth, stride_for_downsampling)
         self.conv2 = conv3x3(bottleneck_depth, bottleneck_depth)
@@ -65,7 +64,6 @@ class Bottleneck(nn.Module):
         self.conv_to_match_dimensions = None
         if in_channels != bottleneck_depth * self.expansion or stride_for_downsampling != 1:
             self.conv_to_match_dimensions = conv1x1(in_channels, bottleneck_depth * self.expansion, stride_for_downsampling)
-            self.bn_for_residual = nn.BatchNorm2d(bottleneck_depth * self.expansion)
         # ! Возможно, стоит вынести проверку на необходимость применения conv_to_match_dimensions
         # отсюда в ResNet и передавать в Bottleneck параметр need_to_match_dimensions
     
@@ -73,20 +71,16 @@ class Bottleneck(nn.Module):
 
         if self.conv_to_match_dimensions is not None:
             identity = self.conv_to_match_dimensions(x)
-            identity = self.bn_for_residual(identity)
         else:
             identity = x
 
         out = self.conv1(x)
-        out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
         out = self.relu(out)
 
         out = self.conv3(out)
-        out = self.bn3(out)
 
         out += identity
         out = self.relu(out)
@@ -118,7 +112,6 @@ class ResNet(nn.Module):
         self.conv1 = nn.Conv2d(
             img_channels, self.cur_block_in_channels,
             kernel_size=7, stride=2, padding=3, bias=False)
-        self.bn1 = nn.BatchNorm2d(self.cur_block_in_channels)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.relu = nn.ReLU(inplace=True)
         self.conv2_x = self._make_blocks(block_nums[0], 64, False)
@@ -154,16 +147,15 @@ class ResNet(nn.Module):
         block = Bottleneck(self.cur_block_in_channels, bottleneck_depth, stride_for_downsampling)
         self.cur_block_in_channels = bottleneck_depth * block.expansion
         blocks.append(block)
-        for _ in range(1, n_blocks):
+        for i in range(1, n_blocks):
             block = Bottleneck(self.cur_block_in_channels, bottleneck_depth)
             blocks.append(block)
         return nn.Sequential(*blocks)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
         x = self.maxpool(x)
+        x = self.relu(x)
         x = self.conv2_x(x)
         x = self.conv3_x(x)
         x = self.conv4_x(x)
