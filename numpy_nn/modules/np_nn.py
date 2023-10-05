@@ -39,6 +39,20 @@ class Module:
                 continue
             layer.eval()
     
+    def is_equal(self, other, check_gradien_equity = True):
+        for self_layer, other_layer in zip(self.get_trainable_layers(), other.get_trainable_layers()):
+            self_pgi_list = self_layer.get_parameters_and_gradients_and_ids()
+            other_pgi_list = other_layer.get_parameters_and_gradients_and_ids()
+            for (self_p, self_g, self_id), (other_p, other_g, other_id) in zip(self_pgi_list, other_pgi_list):
+                if not np.all(self_p == other_p):
+                    return False
+                if check_gradien_equity:
+                    if ((self_g or other_g) is None) and ((self_g and other_g) is not None):
+                        return False
+                    if not np.all(self_g == other_g):
+                        return False
+        return True
+    
 
 class TrainableLayer(Module):
     id_iter = itertools.count()
