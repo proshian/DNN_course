@@ -19,7 +19,7 @@ from numpy_nn.modules.np_nn import (
 )
 
 
-def copy_trainable_parameters(my_module: Module, torch_module: torch.nn.Module) -> None:
+def copy_parameters(my_module: Module, torch_module: torch.nn.Module) -> None:
     if isinstance(my_module, FullyConnectedLayer):
         my_module.weights = torch_module.weight.detach().numpy().T
         my_module.bias = torch_module.bias.detach().numpy().reshape(-1, 1).T
@@ -35,17 +35,17 @@ def copy_trainable_parameters(my_module: Module, torch_module: torch.nn.Module) 
             my_module.bias = torch_module.bias.detach().numpy()
 
 
+
 def test_module(my_module: Module,
                 torch_module: torch.nn.Module,
-                input_shape: Tuple[int, ...],
-                output_shape: Tuple[int, ...],
+                input_np: np.ndarray,
+                dJ_dout: np.ndarray,
                 atol: float = 1e-5,
-                random_sampler: Callable = np.random.rand,
                 skip_parameter_copying: bool = False,
                 print_tensors: bool = False,
                 print_results: bool = False) -> None:
     """
-    Compares the output and gradients of a numpy layer and a torch layer
+    Compares the output and (dJ/dW, dJ/d_input) of numpy and torch layer
 
     Args:
         my_module: neural network layer implemented in numpy.
@@ -63,9 +63,8 @@ def test_module(my_module: Module,
     # copy weights from torch_module to my_module
     # if the numpy layer is trainable
     if not skip_parameter_copying and isinstance(my_module, TrainableLayer):
-        copy_trainable_parameters(my_module, torch_module)
+        copy_parameters(my_module, torch_module)
 
-    input_np = random_sampler(*input_shape).astype(np.float32)
     input_torch = torch.from_numpy(input_np)
     input_torch.requires_grad = True
 
@@ -80,7 +79,7 @@ def test_module(my_module: Module,
     if print_results:
         print("Outputs are equal")
 
-    output_grad_np = random_sampler(*output_shape)
+    output_grad_np = dJ_dout
     output_grad_torch = torch.from_numpy(output_grad_np)
 
     input_grad_np = my_module.backward(output_grad_np)
@@ -155,6 +154,26 @@ def test_module(my_module: Module,
         if print_results:
             print("Bias gradients are equal")
 
+
+
+
+def test_module_randomly(my_module: Module,
+                         torch_module: torch.nn.Module,
+                         input_shape: Tuple[int, ...],
+                         output_shape: Tuple[int, ...],
+                         atol: float = 1e-5,
+                         random_sampler: Callable = np.random.rand,
+                         skip_parameter_copying: bool = False,
+                         print_tensors: bool = False,
+                         print_results: bool = False) -> None:
+    
+    input_np = random_sampler(*input_shape).astype(np.float32)
+    dJ_dout = random_sampler(*output_shape)
+
+    test_module(my_module, torch_module, input_np, dJ_dout, atol,
+                skip_parameter_copying,
+                print_tensors,
+                print_results)
 
 
 
