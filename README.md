@@ -70,13 +70,8 @@ ResNet-101 включает в себя свертку conv1, макс пули�
 
 ### Тестирование
 <!-- 
-coverage run numpy_nn/test/test_fc.py &&
-coverage run -a numpy_nn/test/test_maxpool.py &&
-coverage report -m
- -->
-
-<!-- 
 coverage run numpy_nn/test/test_fc.py
+coverage run -a numpy_nn/test/test_conv2d.py
 coverage report -m
  -->
 

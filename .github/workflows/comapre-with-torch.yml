@@ -26,4 +26,7 @@ jobs:
         run: pip install -r requirements.txt
       
       - name: Run tests
-        run: coverage run numpy_nn/test/test_fc.py && coverage report -m
+        run: >
+          coverage run numpy_nn/test/test_fc.py
+          coverage run -a numpy_nn/test/test_conv2d.py
+          coverage report -m
