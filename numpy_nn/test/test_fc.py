@@ -6,7 +6,6 @@ import torch
 import numpy as np
 
 from test_layer import TestLayer
-
 from numpy_nn.modules.np_nn import FullyConnectedLayer
 
 

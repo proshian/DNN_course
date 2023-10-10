@@ -6,14 +6,13 @@ import torch
 import numpy as np
 
 from test_layer import TestLayer
-
 from numpy_nn.modules.np_nn import Conv2d, Conv2dWithLoops
 
 
 np_seed = 0
 np.random.seed(np_seed)
 
-class TestFullyConnectedLayer(TestLayer):
+class TestConv2d(TestLayer):
 
     def setUp(self) -> None:        
         pass
