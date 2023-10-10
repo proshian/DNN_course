@@ -18,7 +18,7 @@ class TestMaxPool2d(TestLayer):
     def setUp(self) -> None:        
         pass
 
-    def test_maxpool_with_args(self, batch_size: int, height: int,
+    def _test_maxpool_with_args(self, batch_size: int, height: int,
                                width: int, n_channels: int, kernel_size: int,
                                stride: int, padding: int, atol: float = 1e-5,
                                random_sampler: Callable = np.random.rand,
@@ -49,7 +49,7 @@ class TestMaxPool2d(TestLayer):
 
     def test_maxpool_1(self):
         """
-        Conv2d test
+        Maxpool test
         """
         batch_size = 10
         n_channels = 3
@@ -65,7 +65,7 @@ class TestMaxPool2d(TestLayer):
         for sampler in (np.random.rand, np.random.randn):
             for _ in range(n_iters):
                 with self.subTest(sampler = sampler):
-                    self.test_maxpool_with_args(batch_size,
+                    self._test_maxpool_with_args(batch_size,
                                                 height,
                                                 width,
                                                 n_channels,
@@ -78,7 +78,7 @@ class TestMaxPool2d(TestLayer):
 
     def test_maxpool_2(self):
         """
-        Conv2d test
+        Maxpool test
         """
         batch_size = 2
         n_channels = 6
@@ -94,7 +94,7 @@ class TestMaxPool2d(TestLayer):
         for sampler in (np.random.rand, np.random.randn):
             for _ in range(n_iters):
                 with self.subTest(sampler = sampler):
-                    self.test_maxpool_with_args(batch_size,
+                    self._test_maxpool_with_args(batch_size,
                                                 height,
                                                 width,
                                                 n_channels,
