@@ -58,7 +58,18 @@ class TrainableLayer(Module):
     id_iter = itertools.count()
 
     def __init__(self):
-        # id is used to identify the layer's weights and bias in the optimizer
+        # id is used to identify layer's weights and bias in an optimizer.
+
+        # There are supposed to be no layers with same id within a run.
+        # However if we load model from a previous run somehow, there may
+        # be a situation when two models have layers with same ids. It can
+        # be an issue in theory if one optimizer optimizes weights of two
+        # models at the same time. However, I'm not sure that it may happen.
+        # Another potantial danger is adding new layers to a model loaded
+        # from a previous run. In this situation it one model can have
+        # several layers with same id. This will lead to problems
+        # during training. 
+        
         self.id = next(TrainableLayer.id_iter)
     
     def get_parameters_and_gradients_and_ids(self) -> List[Tuple[np.ndarray, np.ndarray, str]]:
@@ -69,8 +80,8 @@ class TrainableLayer(Module):
 
 class FullyConnectedLayer(TrainableLayer):
     def __init__(self, n_input_neurons: int, n_output_neurons: int):
-        # ! id was moved to the Layer class
-        super(FullyConnectedLayer, self).__init__()
+        # ! id is set in TrainableLayer class
+        super().__init__()
         self.weights = np.random.randn(n_input_neurons, n_output_neurons) * 0.01
         self.bias = np.random.randn(1, n_output_neurons) * 0.01
         self.weights_gradient = None

@@ -2,3 +2,4 @@ numpy==1.24.3
 torch==2.0.1  # for functional tests
 dvc==3.24.0  # for trained model weights versioning
 dvc-gdrive==2.20.0  # to access google drive remote dvc storage
+coverage==7.3.2  # for test coverage report
