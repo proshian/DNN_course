@@ -31,4 +31,5 @@ jobs:
           coverage run -a numpy_nn/test/test_conv2d.py
           coverage run -a numpy_nn/test/test_maxpool.py
           coverage run -a numpy_nn/test/test_activations.py
+          coverage run -a numpy_nn/test/test_flatten.py
           coverage report -m
