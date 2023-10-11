@@ -25,12 +25,15 @@ from numpy_nn.modules.np_nn import (
 
 class TestLayer(unittest.TestCase):
     def _get_default_test_data_save_path(self):
-        failed_tests_dir_name = 'failed_tests'
-        failed_tests_path = os.path.join('.', failed_tests_dir_name)
+        failed_tests_dir_name = 'failed_tests_dumps'
+        failed_tests_path = os.path.join('.',
+                                         'numpy_nn',
+                                         'test',
+                                         failed_tests_dir_name)
         if not os.path.exists(failed_tests_path):
             # ! добавить сюда логирование
             os.makedirs(failed_tests_path)
-        str_date = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        str_date = datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
         this_test_name = f'test_{str_date}.pickle'
         this_test_path = os.path.join(failed_tests_path, this_test_name)
         return this_test_path
@@ -163,7 +166,7 @@ class TestLayer(unittest.TestCase):
             print("my and torch input gradients:")
             print(input_grad_np.flatten(), input_grad_torch.flatten())
         self.assertNpCloseWithDumping(
-            np.zeros_like(input_grad_np),
+            input_grad_np,
             input_grad_torch,
             atol,
             "Gradients w.r.t input data are not equal",
