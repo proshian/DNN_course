@@ -70,7 +70,8 @@ class TestConv2d(TestLayer):
                     with self.subTest(input_np = input_np,
                                       dJ_dout = dJ_dout,
                                       sampler = sampler,
-                                      bias = bias):
+                                      bias = bias,
+                                      my_conv2d_constructor = my_conv2d_constructor):
                         self._test_module(
                             my_conv2d,
                             torch_conv2d,
