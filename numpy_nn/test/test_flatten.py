@@ -10,8 +10,10 @@ from test_layer import TestLayer
 from numpy_nn.modules.np_nn import Flatten
 
 
-np_seed = 0
-np.random.seed(np_seed)
+# np_seed = 0
+# torch_seed = 0
+# np.random.seed(np_seed)
+# torch.manual_seed(torch_seed)
 
 class TestMaxPool2d(TestLayer):
 

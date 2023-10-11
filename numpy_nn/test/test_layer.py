@@ -8,7 +8,9 @@ if project_root not in sys.path:
 
 
 import unittest
-from typing import Callable, Tuple, List
+from datetime import datetime
+import pickle
+from typing import Callable, Tuple, Optional, Any
 
 import numpy as np
 import torch
@@ -22,6 +24,60 @@ from numpy_nn.modules.np_nn import (
 
 
 class TestLayer(unittest.TestCase):
+    def _get_default_test_data_save_path(self):
+        failed_tests_dir_name = 'failed_tests_dumps'
+        failed_tests_path = os.path.join('.',
+                                         'numpy_nn',
+                                         'test',
+                                         failed_tests_dir_name)
+        if not os.path.exists(failed_tests_path):
+            # ! добавить сюда логирование
+            os.makedirs(failed_tests_path)
+        str_date = datetime.now().strftime("%Y_%m_%d_%H_%M_%S_%f")
+        this_test_name = f'test_{str_date}.pickle'
+        this_test_path = os.path.join(failed_tests_path, this_test_name)
+        return this_test_path
+
+    def assertNpCloseWithDumping(self,
+                                 arr1,
+                                 arr2,
+                                 atol,
+                                 msg: str,
+                                 save_obj: Any = None,
+                                 save_path: Optional[str] = None):
+        expression_result = np.allclose(arr1, arr2, atol=atol)
+
+        self.assertTrueWithDumping(expression_result, msg, save_obj, save_path)
+
+        # if not expression_result:
+        #     if not save_path:
+        #         save_path = self._get_default_test_data_save_path()
+        #     with open(save_path, 'wb') as f:
+        #         pickle.dump(save_obj, f)
+
+        
+        # self.assertTrue(
+        #     np.allclose(arr1, arr2, atol=atol),
+        #     msg
+        # )
+    
+    def assertTrueWithDumping(self,
+                              expression_result: bool,
+                              msg: str,
+                              save_obj: Any = None,
+                              save_path: Optional[str] = None):
+        if not expression_result:
+            if not save_path:
+                save_path = self._get_default_test_data_save_path()
+            with open(save_path, 'wb') as f:
+                pickle.dump(save_obj, f)
+        
+        self.assertTrue(
+            expression_result,
+            msg
+        )
+
+
     def _copy_parameters(self, my_module: Module, torch_module: torch.nn.Module) -> None:
         if isinstance(my_module, FullyConnectedLayer):
             my_module.weights = torch_module.weight.detach().numpy().T
@@ -64,6 +120,14 @@ class TestLayer(unittest.TestCase):
             skip_parameter_copying: if True, the weights and biases will be held intact.
                 By default, weights and biases are copied from torch_module to my_module.
         """    
+        # For dumping in assertNpCloseWithDumping
+        mio = {
+            'my_module': my_module,
+            'torch_module': torch_module,
+            'input_np': input_np,
+            'dJ_dout': dJ_dout
+        }
+
         # copy weights from torch_module to my_module
         # if the numpy layer is trainable
         if not skip_parameter_copying and isinstance(my_module, TrainableLayer):
@@ -80,9 +144,12 @@ class TestLayer(unittest.TestCase):
             print("my and torch outputs:")
             print(output_np.flatten(), output_torch.detach().numpy().flatten())
         
-        self.assertTrue(
-            np.allclose(output_np, output_torch.detach().numpy(), atol=atol),
-            "Outputs are not equal"
+        self.assertNpCloseWithDumping(
+            output_np,
+            output_torch.detach().numpy(),
+            atol,
+            "Outputs are not equal",
+            mio
         )
 
         if print_results:
@@ -98,9 +165,12 @@ class TestLayer(unittest.TestCase):
         if print_tensors:
             print("my and torch input gradients:")
             print(input_grad_np.flatten(), input_grad_torch.flatten())
-        self.assertTrue(
-            np.allclose(input_grad_np, input_grad_torch, atol=atol),
-            "Gradients w.r.t input data are not equal"
+        self.assertNpCloseWithDumping(
+            input_grad_np,
+            input_grad_torch,
+            atol,
+            "Gradients w.r.t input data are not equal",
+            mio
         )
         if print_results:
             print("Input gradients are equal")
@@ -125,18 +195,26 @@ class TestLayer(unittest.TestCase):
             if print_tensors:
                 print("my and torch running means:")
                 print(my_module.running_mean.flatten(), torch_module.running_mean.detach().numpy().flatten())
-            running_mean_close = np.allclose(
-                my_module.running_mean.flatten(), torch_module.running_mean.detach().numpy().flatten(), atol=atol)
-            self.assertTrue(running_mean_close, "Running mean is not equal")
+            self.assertNpCloseWithDumping(
+                my_module.running_mean.flatten(),
+                torch_module.running_mean.detach().numpy().flatten(),
+                atol,
+                "Running mean is not equal",
+                mio
+            )
             if print_results:
                 print("Running means are equal")
 
             if print_tensors:
                 print("my and torch running vars:")
                 print(my_module.running_var.flatten(), torch_module.running_var.detach().numpy().flatten())
-            running_var_close = np.allclose(
-                my_module.running_var.flatten(), torch_module.running_var.detach().numpy().flatten(), atol=atol)
-            self.assertTrue(running_var_close, "Running var is not equal")
+            self.assertNpCloseWithDumping(
+                my_module.running_var.flatten(),
+                torch_module.running_var.detach().numpy().flatten(),
+                atol,
+                "Running var is not equal",
+                mio
+            )
             if print_results:
                 print("Running vars are equal")
                 
@@ -153,7 +231,10 @@ class TestLayer(unittest.TestCase):
             print("my and torch weight gradients:")
             print(weight_grad_np.flatten(), weight_grad_torch.flatten())
             
-        self.assertTrue(weight_grads_close, "Gradients w.r.t. weights are not equal")
+        self.assertTrueWithDumping(
+            weight_grads_close,
+            "Gradients w.r.t. weights are not equal",
+            mio)
         if print_results:
             print("Weight gradients are equal")
 
@@ -162,9 +243,10 @@ class TestLayer(unittest.TestCase):
                 print("my and torch bias gradients:")
                 print(bias_grad_np.flatten(), bias_grad_torch.flatten())
 
-            self.assertTrue(
+            self.assertTrueWithDumping(
                 np.allclose(bias_grad_np, bias_grad_torch, atol=atol),
-                "Gradients w.r.t. biases are not equal")
+                "Gradients w.r.t. biases are not equal",
+                mio)
             if print_results:
                 print("Bias gradients are equal")
 
