@@ -6,7 +6,13 @@ The model was trained on MNIST dataset. Also, ResNet-101 was implemented on torc
 
 ## Root directory structure
 * [numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) - [numpy resnet implementation](./numpy_nn/models/resnet.py) training on MNIST using Adam optimizer
-* [numpy_nn](./numpy_nn) - numpy implementation of resnet101, all layers needed to create this model, as well as optimizers (SGD, Adam) and CE Loss. Testing of all listed
+* [numpy_nn](./numpy_nn)
+    * Numpy implementation of:
+        * resnet101
+        * all layers needed to create resnet101
+        * optimizers (SGD, Adam)
+        * CE Loss
+    * Testing of all listed
 * [pytorch_nn](./pytorch_nn) - pytorch resnet101 implementation
 * Other directories:
     * [utils](./utils) - python modules that are helpful in jupyter notebooks. For example, [utils/plot.py](./utils/plot.py) contains functions for plotting epoch histories
