@@ -1,21 +1,23 @@
 # ResNet-101 numpy
 
-ResNet-101 using only numpy
+ResNet-101 на numpy без других библиотек и апробация на MNIST
 
-The model was trained on MNIST dataset. Also, ResNet-101 was implemented on torch for testing numpy implementation.
+Также была реализована ResNet-101 на torch для тестирования numpy реализации.
 
-## Root directory structure
-* [numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) - [numpy resnet implementation](./numpy_nn/models/resnet.py) training on MNIST using Adam optimizer
-* [numpy_nn](./numpy_nn) - numpy implementation of resnet101, all layers needed to create this model, as well as optimizers (SGD, Adam) and CE Loss. Testing of all listed
-* [pytorch_nn](./pytorch_nn) - pytorch resnet101 implementation
-* Other directories:
-    * [utils](./utils) - python modules that are helpful in jupyter notebooks. For example, [utils/plot.py](./utils/plot.py) contains functions for plotting epoch histories
+## Содержимое корня репозитория
+* [numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) - обучение [numpy реализации](./numpy_nn/models/resnet.py) resnet-101 на датасете MNIST с использованием оптимизатора Adam
+* Python packages, имплементиррованные в рамках проекта:
+    * [numpy_nn](./numpy_nn) - реализация с использованием только numpy resnet101, всех слоев, необходимых для создания данной модели, а также оптимизаторов (SGD, Adam) и CE Loss. Тестиорваие всего перечисленного
+    * [pytorch_nn](./pytorch_nn) - реализация resnet101 на pytorch
+* Другое:
+    * [utils](./utils) - python модули, полезные в jupyter блокноте проекта. Например, вывод графиков с историей обучения
 
-[numpy_nn](./numpy_nn/) and [pytorch_nn](./pytorch_nn) directories should be treated as libraries
+Директории [numpy_nn](./numpy_nn) и [pytorch_nn](./pytorch_nn) следует воспринимать как библиотеки, внутри которых нет исполняемого кода
 
-## Theory
+
+## Теоретическая база
 ### ResNet-101
-![There should be a picture of ResNet-101 architecture. It should be in images_for_readme directory](./images_for_readme/resnet101_architecture.svg)
+![Здесь должно быть изображение с архитектурой ResNet-101. Оно должжно быть в папке images_for_readme](./images_for_readme/resnet101_architecture.svg)
 
 ### Adam
 ![Adam](./images_for_readme/Adam.png)
@@ -27,7 +29,8 @@ ResNet-101 включает в себя свертку conv1, макс пули�
 В conv1 размерность плоскости входного тензора уменьшается вдвое в связи с тем, что stride = 2. Перед conv2_1 производится даунсемплинг карты признаков (feature map) в 2 раза с помощью max pooling'а. Далее conv3_1, conv_4_1 и conv5_1 первая свертка bottleneck'а имеет stride = 2. Таким образом, ширина и высота сходного "изображения" сужаются в 32 раза перед тем как дойти до average pooling, который оставляет одно значение для каждого канала. Такой пулинг позволяет использовать входные данные произвольной размерности. Тем не менее, в связи с понижением размерности при проходе через сеть вход должен быть не менее 32 и, желательно, кратен 32 (иначе тензоры будут "обрезаться").
 -->
 
-## Resnet-101 numpy implementation (numpy_nn content) and trainig
+## Реализация resnet-101 на numpy (содержимое numpy_nn) и обучение 
+
 ### Базовые слои
 Базовые модули сврточной нейронной сети, оптимизаторы и функция потерь реализованы в директории [./numpy_nn/modules](./numpy_nn/modules).
 
