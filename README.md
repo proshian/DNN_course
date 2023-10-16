@@ -128,16 +128,16 @@ There are two reasons why model and optimizer are saved in the same structure:
 2. If saved separately, the links between the model parameters and the optimizer are broken. To be more precise, between the layers of the neural network and the optimizer, because in this implementation, the optimizer requests the current parameters and gradients from layers. This means that identical layers would be stored in the optimizer and in the model, but they would be different objects and optimizer won't update model parameters. The solution to the problem would be to execute `optimizer.trainable_layers = model.trainable_layer` after loading the optimizer and model.
 3. Since the parameters need to be stored in both the model and the optimizer, saving to separate files would take up more memory
 
-## Реализация resnet-101 на torch
-<!-- Весь код находится в директории [./pytorch_nn](./pytorch_nn). -->
+## resnet-101 pytorch implementation
 
-В [./pytorch_nn/models/resnet.py](./pytorch_nn/models/resnet.py) Находится моя имплементация resnet на pytorch. Классы аналогичны описанным выше для numpy.
+[./pytorch_nn/models/resnet.py](./pytorch_nn/models/resnet.py) implements resnet-101 using pytorch. It contains `Bottleneck` and `ResNet` classes and `resnet101` function similar to their numpy counterparts described above.
 
+## Conclusions
+Implementing models in numpy is a captivating exercise that helps structure knowledge about neural networks and make sure that you fully understand how they work. 
 
-## Выводы по работе
-Очевидно, работать с моделями, используя фреймворки удобнее, так как они высокооптимизированы и поддерживают cuda.
+Obviously, using numpy for real projects is not recommended. Highly optimized frameworks like pytorch, tensorflow, jax, etc are much more convenient and efficient (also note that numpy doesn't support GPU).
 
-Исползование реализации свертки в виде матричного умножения делает скорость обратного распространения значительно быстрее продемонстрировано в конце [./numpy_nn/test/module_tests.ipynb](./numpy_nn/test/module_tests.ipynb). Например, при параметрах n_input_channels = 4,n_output_channels = 2, width = 3, height = 5, kernel_size = 3, stride = 1, padding = 3 и batchsize = 8 1000 итераций обратного распространения на pytorch занимают 1.2 секунды, при матричной имлементации свертки - 4.2 секунды, а на циклах - 20.7 секунды.
+Switching to a Conv2d implementation based on matrix multiplication leads to a much faster backpropagation as shown at the end of [./numpy_nn/test/module_tests.ipynb](./numpy_nn/test/module_tests.ipynb). For example, with parameters n_input_channels = 4,n_output_channels = 2, width = 3, height = 5, kernel_size = 3, stride = 1, padding = 3, and batch size = 8, 1000 iterations of backpropagation on official pytorch implementation take 1.2 seconds, 4.2 seconds on a matrix convolution implementation, and 20.7 seconds on loops based numpy implementation.
 
 <!-- Изначально моя имплементцаия resnet-101 не содержала батч-нормализацию. Ее использование ускорило обучение  -->
 
@@ -147,31 +147,27 @@ There are two reasons why model and optimizer are saved in the same structure:
 
 <!-- В данном эксперименте не было выявлено заявленных преимуществ AdaBound. -->
 
-## Использованные источники
+## Sources
 1. [Adam](https://arxiv.org/abs/1412.6980)
 2. [ResNet](https://arxiv.org/pdf/1512.03385.pdf)
 
 
 # TODO
 
-* Получить батчнормализацию, которая будет проходить тесты с точностью 1e-6
-
+* Create a batchnorm implementation that would pass the tests with accuracy 1e-6
 * add loss test funciton
 * Check if test_stack_of_layers works
+* Return batchnorm to resnet when it's fixed
 
-* Мб добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
-
-* Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 
-
-
-Второстепенные todo задачи:
-
+Minor todo tasks:
 <!-- * Добавить нормализацию изображений Stanford Cars датасета
 * Так как машины не квадратные, возможно, лучше приводить к размеру 64x96 -->
-* Переписать [./numpy_CNN/NumpyNN/NN_np](./numpy_CNN/NumpyNN/NN_np.py), чтобы оптимизаторы принимали параметры, а не обучаемые слои. (Уже ведется работа в отдельном branch'е)
-* Сделать методы сохранения параметров модели (или обучаемых слоев модели) в файл и загрузки из файла. Как минимум потому что обучаемые слои хранят входные данные => Если делать pickle модели целиком, записывется много бесполезной информации 
-* Сделать вариант forward и backward Conv2d, где forward не сохраняет преобразованные input, а backward применяет преобразование к исходному input. Будет работать немного медленнее, но сильно сэкономит память
-* Можно обобщить batchnorm (чтобы работал для любой размерности). Например, сделать backward как тут: https://github.com/ddbourgin/numpy-ml/blob/master/numpy_ml/neural_nets/layers/layers.py#L969-L1215
+
+* Create methods for saving model parameters (or trained model layers) to a file and loading from a file. Thus we would avoid saving useless data that wastes space. Another reson is that pickling whole model may result in an outdated version if we make changes to the model class (add new methods for example).  
+* Make a Conv2d variation, where forward does not store the transformed input, and backward applies the transformation to the original input. This would be a bit slower, but would save a lot of memory
+* Maybe generalise batchnorm (to work for any dimensionality). For example, make backward as here: https://github.com/ddbourgin/numpy-ml/blob/master/numpy_ml/neural_nets/layers/layers.py#L969-L1215
 
 
-В ветке `adabound-and-batchnorm` ведется работа по добавлению в resnet батчевой нормализации, а также эксперименты по сравнению Adam и Adabound
+## Other branches:
+* `adabound-and-batchnorm` - returning batchnorm toresnet + experiments that compare Adam and Adabound
+* `optimizers_take_parameters` - rewriting the code so that optimizers take neural network parameters as arguments instead of trainable layers
