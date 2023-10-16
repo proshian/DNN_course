@@ -139,7 +139,7 @@ There are two reasons why model and optimizer are saved in the same structure:
 [./pytorch_nn/models/resnet.py](./pytorch_nn/models/resnet.py) implements resnet-101 using pytorch. It contains `Bottleneck` and `ResNet` classes and `resnet101` function similar to their numpy counterparts described above.
 
 ## Conclusions
-Implementing models in numpy is a captivating exercise that helps structure knowledge about neural networks and make sure that you fully understand how they work. 
+Implementing models on numpy is a captivating exercise that helps structure knowledge about neural networks and make sure that you fully understand how they work. 
 
 Obviously, using numpy for real projects is not recommended. Highly optimized frameworks like pytorch, tensorflow, jax, etc are much more convenient and efficient (also note that numpy doesn't support GPU).
 
