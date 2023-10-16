@@ -1,23 +1,31 @@
 # ResNet-101 numpy
 
-ResNet-101 на numpy без других библиотек и апробация на MNIST
+ResNet-101 using numpy only
 
-Также была реализована ResNet-101 на torch для тестирования numpy реализации.
+## This readme in other languages
 
-## Содержимое корня репозитория
-* [numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) - обучение [numpy реализации](./numpy_nn/models/resnet.py) resnet-101 на датасете MNIST с использованием оптимизатора Adam
-* Python packages, имплементиррованные в рамках проекта:
-    * [numpy_nn](./numpy_nn) - реализация с использованием только numpy resnet101, всех слоев, необходимых для создания данной модели, а также оптимизаторов (SGD, Adam) и CE Loss. Тестиорваие всего перечисленного
-    * [pytorch_nn](./pytorch_nn) - реализация resnet101 на pytorch
-* Другое:
-    * [utils](./utils) - python модули, полезные в jupyter блокноте проекта. Например, вывод графиков с историей обучения
+* [Russian](README.ru.md)
 
-Директории [numpy_nn](./numpy_nn) и [pytorch_nn](./pytorch_nn) следует воспринимать как библиотеки, внутри которых нет исполняемого кода
+Note that only English version is guaranteed to be up-to-date.
 
+## Root directory structure
+* [numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) - [numpy resnet implementation](./numpy_nn/models/resnet.py) training on MNIST using Adam optimizer
+* [numpy_nn](./numpy_nn)
+    * Numpy implementation of:
+        * resnet101
+        * all layers needed to create resnet101
+        * optimizers (SGD, Adam)
+        * CE Loss
+    * Testing of all listed against pytorch implementations
+* [pytorch_nn](./pytorch_nn) - pytorch resnet101 implementation
+* Other directories:
+    * [utils](./utils) - python modules that are helpful in jupyter notebooks. For example, [utils/plot.py](./utils/plot.py) contains functions for plotting epoch histories
 
-## Теоретическая база
+[numpy_nn](./numpy_nn/) and [pytorch_nn](./pytorch_nn) directories should be treated as libraries.
+
+## Theory
 ### ResNet-101
-![Здесь должно быть изображение с архитектурой ResNet-101. Оно должжно быть в папке images_for_readme](./images_for_readme/resnet101_architecture.svg)
+![There should be a picture of ResNet-101 architecture. It should be in images_for_readme directory](./images_for_readme/resnet101_architecture.svg)
 
 ### Adam
 ![Adam](./images_for_readme/Adam.png)
@@ -29,15 +37,14 @@ ResNet-101 включает в себя свертку conv1, макс пули�
 В conv1 размерность плоскости входного тензора уменьшается вдвое в связи с тем, что stride = 2. Перед conv2_1 производится даунсемплинг карты признаков (feature map) в 2 раза с помощью max pooling'а. Далее conv3_1, conv_4_1 и conv5_1 первая свертка bottleneck'а имеет stride = 2. Таким образом, ширина и высота сходного "изображения" сужаются в 32 раза перед тем как дойти до average pooling, который оставляет одно значение для каждого канала. Такой пулинг позволяет использовать входные данные произвольной размерности. Тем не менее, в связи с понижением размерности при проходе через сеть вход должен быть не менее 32 и, желательно, кратен 32 (иначе тензоры будут "обрезаться").
 -->
 
-## Реализация resnet-101 на numpy (содержимое numpy_nn) и обучение 
+## Resnet-101 numpy implementation (numpy_nn content) and trainig
+### Basic Layers
+Basic Layers of a neural network, optimizers and loss function are implemented in the directory [./numpy_nn/modules](./numpy_nn/modules).
 
-### Базовые слои
-Базовые модули сврточной нейронной сети, оптимизаторы и функция потерь реализованы в директории [./numpy_nn/modules](./numpy_nn/modules).
-
-Реализованы классы:
+Implemented classes include:
 * FullyConnectedLayer
-* Conv2d — реализация свертки с помощью матричного умножения. Подробнее в [./numpy_nn/modules/README.md](./numpy_nn/modules/README.md).
-* Conv2dWithLoops — имплементация свертки на циклах.
+* Conv2d — convolution implementation using matrix multiplication. More details in [./numpy_nn/modules/README.md](./numpy_nn/modules/README.md).
+* Conv2dWithLoops — convolution implementation using loops.
 * MaxPool2d
 * Flatten
 * ReLULayer
@@ -50,31 +57,29 @@ ResNet-101 включает в себя свертку conv1, макс пули�
 * BatchNormalization2d
 
 
-Реализация свертки, основанной на матричном умножении, привела к **более чем 34-ех кратному ускорению обучения** resnet101 на MNIST! На скриншоте ниже видно, что ранее одна эпоха треборвала более 114 часов, теперь около 3 часов.
+The convolution implementation based on matrix multiplication has led to a **more than 34-fold acceleration in the training of ResNet101 on MNIST** relative to a naive implementation. The screenshot below illustrates that previously one epoch took over 114 hours, and now it's around 3 hours.
 
 ![performance comparison](./images_for_readme/performance.png)
 
 
-
-В моей реализации оптимизаторы получают на вход список слоёв. Это необходимо, потому что на данный момент, чтобы получить актуальные частные производные функции потрерь по параметрам, нужно их запросить у слоя, так как они изменяются не inplace. Каждый модуль нейронной сети (дочерние классы класса Layer, а также классы реализующие части нейронной сети или нейронную сеть целиком) имеют метод get_trainable_layers, возвращающий все обучаемые слои, входящие в состав модуля. Выход данного метода подется на вход конструктору оптимизатора. В ветке [optimizers_take_parameters](https://github.com/proshian/DNN_course_ITMO_2022/tree/optimizers_take_parameters) ведется работа, чтобы оптимизаторы принимали параметры, а слои были переписаны так, чтобы частные производные всегда были одними и теми же numpy матрицами, которые меняются inplace.
-
+Currently, optimizers take a list of neural network layers as input. This is necessary because, at the moment, to obtain the current partial derivatives of the loss function with respect to the parameters, they are requested from the layer since gradients are not changed in place. Each neural network module (child classes of the Module class, including basic layers, classes implementing parts of the neural network or entire neural networks) has a method called `get_trainable_layers`, which returns all trainable layers within the module. The output of this method is passed to the optimizer's constructor. The [optimizers_take_parameters](https://github.com/proshian/DNN_course_ITMO_2022/tree/optimizers_take_parameters) branch aims to rewrite toe code so that there are classes Parameters and TrainableParameters that always store current parametrs and gradient related to a corresponding nn.Module.
 
 
-### ResNet-101 
-В модуле [numpy_nn/models/resnet.py](./numpy_nn/models/resnet.py) реализация resnet-101 на numpy. Там находятся:
-* реалиация `Bottleneck` residual block'а
-* класс `ResNet`, который собирает архитектуру получая на вход список количеств residual ботлнеков каждой конфигурации 
-* Функция `resnet101` вызывающая конструктор класса `ResNet` с количествами ботлнеков: [3, 4, 23, 3]
+### ResNet-101
+In the module [numpy_nn/models/resnet.py](./numpy_nn/models/resnet.py), the implementation of ResNet-101 in numpy can be found. It includes:
+* The `Bottleneck` residual block class
+* The `ResNet` class, which constructs the architecture by receiving a list of the numbers of residual bottlenecks
+* The function `resnet101` that calls the `ResNet` constructor with a correct list of bottelneck numbers: [3, 4, 23, 3]
 
-<!-- Также в директории [numpy_nn/models](./numpy_nn/models/) присутствует реализация [resnet101 без батч-нормализации](./numpy_nn/models/resnet_without_batchnorm.py) -->
+<!-- Also in the directory [numpy_nn/models](./numpy_nn/models/), there is an implementation of [resnet101 without batch normalization](./numpy_nn/models/resnet_without_batchnorm.py) -->
 
 
-### Тестирование
-Директория [numpy_nn/test](./numpy_nn/test/) посвящена тестированию классов, реализующих модули нейронной сети на numpy.
+### Testing
+The directory [numpy_nn/test](./numpy_nn/test/) is dedicated to testing classes that implement neural network modules in numpy.
 
-Для тестирования используются аналогичные классы на pytorch. Если тестируется обучаемый модуль, обе реализации инициализируются одинаковыми весами. В качетве входных данных и частной производной функции потерь по выходу модуля генерируются тезоры случайных чисел. Производится forward и backward проходы и Сравниваются выходы, а также частные производные функции потерь по весам, смещениям (bias) и входным данным.
+For testing, pytorch implementations are used. When a trainable module is tested, both implementations are initialized with the same weights. Random tensors are generated as input data and the partial derivative of the loss function with respect to the module's output. Forward and backward passes are performed, and outputs, as well as partial derivatives of the loss function with respect to weights, biases, and input data, are compared.
 
-Таким образом, псевдокод теста выглядит так:
+The pseudo-code for a test looks like this:
 ```python
 MY_MODULE.init_weights_with(TORCH_MODULE)
 
@@ -95,51 +100,50 @@ print("out all close:", np.allclose(out, torch_out.detach().numpy()))
 print("d_J_d_in all close:", np.allclose(d_J_d_in, input_torch.grad.detach().numpy()))
 ```
 
-Тестирование производится с помощью библиотеки unittest. Все классы, тестирующие какие-либо модули нейронной сети являются наследниками класса TestLayer, определенного python модуле [test_layer.py](./numpy_nn/test/test_layer.py). Алгоритм, описанный выше реализован в методе _test_module, класса TestLayer. Тесты большинства модулей нейронной сети реализованы в виде отдельных скриптов в директории [test](./numpy_nn/test), однако некоторые тесты временно находятся в jupyter notebook'е [module_tests.ipynb](./numpy_nn/test/module_tests.ipynb). Тесты из jupyter notebook'а не заействуют unittest. Они будут переписаны и перенесены в отдельные скрипты.
+Testing is carried out using the unittest library. All classes that test a neural network module are subclasses of the TestLayer class defined in [test_layer.py](./numpy_nn/test/test_layer.py). The algorithm described above is implemented in the _test_module method of the TestLayer class. Most nn module tests are implemented as separate scripts in the [test](./numpy_nn/test) directory. However, some tests are temporarily performed in [module_tests.ipynb](./numpy_nn/test/module_tests.ipynb) jupyter notebook. Theese tests don't use unittest. They will be rewritten and moved to separate scripts.
 
-Если тестирование проходит успешно, то в консоль выводится сообщение "OK". В противном случае выводится сообщение об ошибке и в директории [test/failed_tests_dumps](./numpy_nn/test/failed_tests_dumps) сохраняется pickle файл. Этот файл хранит словарь с ключами 'my_module', 'torch_module', 'input_np', 'dJ_dout', позволяющими воспроизвести тест, на котором произошла ошибка.
+If the tests pass successfully, the console displays an "OK" message. Otherwise, an error message is displayed, and a pickle file is saved in the [test/failed_tests_dumps](./numpy_nn/test/failed_tests_dumps) directory. This file contains a dictionary with keys 'my_module', 'torch_module', 'input_np', 'dJ_dout', allowing the reproduction of the failed test.
 
-При каждом pull-request'е в ветку main запускается `compare_with_pytorch` workflow, который запускает все тесты и производит coverage report.
+With each pull request to the main branch, the `compare_with_pytorch` workflow is triggered. It runs all tests and produces a coverage report.
 
-Все базовые модули нейронной сети, кроме батчевой нормализации, имеют результаты (под результатами понимаются чатные производные результата работы слоя по всем параметрам и выходным данным), совпадающие с pytorch до 6 знаков после запятой. Результаты батчевой нормализации свпадают до 4 знаков после запятой.
+All basic neural network modules, except batch normalization, have results (partial derivatives of the module's output with respect to all parameters and input data) matching PyTorch up to 6 decimal places. Batch normalization results match up to 4 decimal places.
 
-Выходные данные и частная производня функции потерь по входным данным resnet101 совпадают с аналогом на pytorch до 6 знаков после запятой.
+The output and partial derivative of the loss function with respect to the input data of numpy ResNet101 match with its pytorch counterpart up to 6 decimal places.
 
-### Обучение
-В [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) произведено обучение на датасете MNIST моей реализации resnet-101 на numpy. Также в этом файле предоставлен код для определения и обучения небольшой сверточной нейронной сети, чтобы продемонстрировать, как пользоваться реализованными класами.
+### Training
+Training is performed in [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb). ResNet-101 numpy implementation is trained on MNIST dataset. This notebook also features code that defines and traines a small convolutional neural network to demonstrate how to use the implemented classes in a general case.
 
-Результаты обучения resnet на numpy на графикe ниже.
+Training results of numpy resnet implementation are shown on the graph below.
 
 ![numpy resnet-101 results](./images_for_readme/numpy_resnet_results.png)
 
 
-### Обученная модель
-В [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) после каждой эпохи обучения формируется словарь model_optimizer_history:
-* 'model': модель в состоянии
-* 'optimizer': оптимизатор в состоянии
-* 'epoch_history': история обучения - словарь с ключами, соответствующими фазе обучения (в данном случае 'train' и 'test'), и значениями - словарями, отражающими историю фазы. Эти вложенные словари имеют названия метрик в качестве ключей и списки со значениями метрик на каждой эпохе в качестве значений.
-* 'model_info': словарь с информацией о модели и о гиперпараметрах обучения (например, использованном батчсайзе) 
+### Trained model
+The train function in [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) generates a model_optimizer_history dictionary after each epoch. This dictionary contains the following keys:
+* 'model': model (in state)
+* 'optimizer': optimizer (in state)
+* 'epoch_history': training history - a dictionary with keys corresponding to the training phase (in this case, 'train' and 'test'), and values - dictionaries reflecting the history of the phase. These nested dictionaries have metric names as keys and lists with metric values for each epoch as values
+* 'model_info': a dictionary with information about the model and hyperparameters of training (for example, the batch size used)
 
-Словарь model_optimizer_history сохраняется в файл `./numpy_nn/models/trained_models/resnet101/model_optimizer_history_dict.pickle`. Благодаря этому словарю можно продолжить обучение с эпохи, на которой оно было прервано, вывести график с историей обучения. 
+The model_optimizer_history dictionary is saved to the file `./numpy_nn/models/trained_models/resnet101/model_optimizer_history_dict.pickle`. It allows you to continue training from the epoch at which it was interrupted or output a graph with the training history.
 
-В github репозитории файл `model_optimizer_history_dict.pickle` отсутствует. Он версионируется с помощью DVC и хранится в удаленном хранилище. Чтобы получить версию файла `model_optimizer_history_dict.pickle`, актуальную для версии репозитория, в которой мы находимся,  необходимо в командной строке перейти в репозиторий и выполнить комманду `dvc pull`. После этого файл `model_optimizer_history_dict.pickle` появится в директории `./numpy_nn/models/trained_models/resnet101/`. При этом это будет актуальный словарь: если запустить обучение в `numpy_resnet_mnist.ipynb`, будет получен идентичный словарь с такими же значениями, такими же ключами, такой же структурой, такими же весами нейронной сети и таким же состоянием оптимизатора.
+The `model_optimizer_history_dict.pickle` is not present in this github repository. It is versioned via DVC and stored in a remote storage. To get the version of the `model_optimizer_history_dict.pickle` file that is relevant to the version of the repository you are in, you need to go to the repository in the terminal and run the command `dvc pull`. After that, the `model_optimizer_history_dict.pickle` file will appear in the `./numpy_nn/models/trained_models/resnet101/` directory. Note that it will contain an up-to-date version of the file, meaning that if you run training, in `numpy_resnet_mnist.ipynb`, you will get a dictionary with the same structure, the same keys, the same values (the same neural network weights, and the same optimizer state).
 
-Нужно отметить, что есть две причины, по которым оптимизатор и модель сохраняются в одной структуре
-1. Инкапсуляция: так не возникает вопроса какой файл оптимизатора относится к какому файлу модели
-2. Если сохранять отдельно, нарушаются связи между параметрами модели и оптимизатором. Если быть точнее, между слоями нейронной сети и оптимизатором, потому что в данной имплементации оптимизатор запрашивает актуальные параметры у слоя (потому что мне сходу не пришло в голову, что я могу передавать параметры оптимизатору "по ссылке" если создам класс параметров). То есть и в оптимизаторе и в модели хранились бы идентичные слои, но являющиеся различными объектами. Решенем проблемы было бы выполнение  `optimizer.trainable_layers = model.trainable_layer` после загрузки оптимизатора и модели.
-3. В связи с тем, что парметры нужно хранить и в модели и в оптимизаторе, раздельное сохранение затрачивало бы больше памяти
+There are two reasons why model and optimizer are saved in the same structure:
+1. Encapsulation: there is no question of which optimizer file belongs to which model file
+2. If saved separately, the links between the model parameters and the optimizer are broken. To be more precise, between the layers of the neural network and the optimizer, because in this implementation, the optimizer requests the current parameters and gradients from layers. This means that identical layers would be stored in the optimizer and in the model, but they would be different objects and optimizer won't update model parameters. The solution to the problem would be to execute `optimizer.trainable_layers = model.trainable_layer` after loading the optimizer and model.
+3. Since the parameters need to be stored in both the model and the optimizer, saving to separate files would take up more memory
 
+## resnet-101 pytorch implementation
 
-## Реализация resnet-101 на torch
-<!-- Весь код находится в директории [./pytorch_nn](./pytorch_nn). -->
+[./pytorch_nn/models/resnet.py](./pytorch_nn/models/resnet.py) implements resnet-101 using pytorch. It contains `Bottleneck` and `ResNet` classes and `resnet101` function similar to their numpy counterparts described above.
 
-В [./pytorch_nn/models/resnet.py](./pytorch_nn/models/resnet.py) Находится моя имплементация resnet на pytorch. Классы аналогичны описанным выше для numpy.
+## Conclusions
+Implementing models on numpy is a captivating exercise that helps structure knowledge about neural networks and make sure that you fully understand how they work. 
 
+Obviously, using numpy for real projects is not recommended. Highly optimized frameworks like pytorch, tensorflow, jax, etc are much more convenient and efficient (also note that numpy doesn't support GPU).
 
-## Выводы по работе
-Очевидно, работать с моделями, используя фреймворки удобнее, так как они высокооптимизированы и поддерживают cuda.
-
-Исползование реализации свертки в виде матричного умножения делает скорость обратного распространения значительно быстрее продемонстрировано в конце [./numpy_nn/test/module_tests.ipynb](./numpy_nn/test/module_tests.ipynb). Например, при параметрах n_input_channels = 4,n_output_channels = 2, width = 3, height = 5, kernel_size = 3, stride = 1, padding = 3 и batchsize = 8 1000 итераций обратного распространения на pytorch занимают 1.2 секунды, при матричной имлементации свертки - 4.2 секунды, а на циклах - 20.7 секунды.
+Switching to a Conv2d implementation based on matrix multiplication leads to a much faster backpropagation as shown at the end of [./numpy_nn/test/module_tests.ipynb](./numpy_nn/test/module_tests.ipynb). For example, with parameters n_input_channels = 4,n_output_channels = 2, width = 3, height = 5, kernel_size = 3, stride = 1, padding = 3, and batch size = 8, 1000 iterations of backpropagation on official pytorch implementation take 1.2 seconds, 4.2 seconds on a matrix convolution implementation, and 20.7 seconds on loops based numpy implementation.
 
 <!-- Изначально моя имплементцаия resnet-101 не содержала батч-нормализацию. Ее использование ускорило обучение  -->
 
@@ -149,35 +153,27 @@ print("d_J_d_in all close:", np.allclose(d_J_d_in, input_torch.grad.detach().num
 
 <!-- В данном эксперименте не было выявлено заявленных преимуществ AdaBound. -->
 
-## Использованные источники
+## Sources
 1. [Adam](https://arxiv.org/abs/1412.6980)
 2. [ResNet](https://arxiv.org/pdf/1512.03385.pdf)
 
 
 # TODO
 
-* Получить батчнормализацию, которая будет проходить тесты с точностью 1e-6
-
+* Create a batchnorm implementation that would pass the tests with accuracy 1e-6
 * add loss test funciton
 * Check if test_stack_of_layers works
+* Return batchnorm to resnet when it's fixed
 
-* Update the readme
-    * translate README to English
-    * добавить раздел поясняющий как устроены тесты
-
-* Мб добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
-
-* Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 
-
-
-Второстепенные todo задачи:
-
+Minor todo tasks:
 <!-- * Добавить нормализацию изображений Stanford Cars датасета
 * Так как машины не квадратные, возможно, лучше приводить к размеру 64x96 -->
-* Переписать [./numpy_CNN/NumpyNN/NN_np](./numpy_CNN/NumpyNN/NN_np.py), чтобы оптимизаторы принимали параметры, а не обучаемые слои. (Уже ведется работа в отдельном branch'е)
-* Сделать методы сохранения параметров модели (или обучаемых слоев модели) в файл и загрузки из файла. Как минимум потому что обучаемые слои хранят входные данные => Если делать pickle модели целиком, записывется много бесполезной информации 
-* Сделать вариант forward и backward Conv2d, где forward не сохраняет преобразованные input, а backward применяет преобразование к исходному input. Будет работать немного медленнее, но сильно сэкономит память
-* Можно обобщить batchnorm (чтобы работал для любой размерности). Например, сделать backward как тут: https://github.com/ddbourgin/numpy-ml/blob/master/numpy_ml/neural_nets/layers/layers.py#L969-L1215
+
+* Create methods for saving model parameters (or trained model layers) to a file and loading from a file. Thus we would avoid saving useless data that wastes space. Another reson is that pickling whole model may result in an outdated version if we make changes to the model class (add new methods for example).  
+* Make a Conv2d variation, where forward does not store the transformed input, and backward applies the transformation to the original input. This would be a bit slower, but would save a lot of memory
+* Maybe generalise batchnorm (to work for any dimensionality). For example, make backward as here: https://github.com/ddbourgin/numpy-ml/blob/master/numpy_ml/neural_nets/layers/layers.py#L969-L1215
 
 
-В ветке `adabound-and-batchnorm` ведется работа по добавлению в resnet батчевой нормализации, а также эксперименты по сравнению Adam и Adabound
+## Other branches:
+* `adabound-and-batchnorm` - returning batchnorm to resnet + experiments that compare Adam and Adabound
+* `optimizers_take_parameters` - rewriting the code so that optimizers take neural network parameters as arguments instead of trainable layers
