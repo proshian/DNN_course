@@ -104,20 +104,20 @@ All basic neural network modules, except batch normalization, have results (part
 
 The output and partial derivative of the loss function with respect to the input data of numpy ResNet101 match with its pytorch counterpart up to 6 decimal places.
 
-### Обучение
-В [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) произведено обучение на датасете MNIST моей реализации resnet-101 на numpy. Также в этом файле предоставлен код для определения и обучения небольшой сверточной нейронной сети, чтобы продемонстрировать, как пользоваться реализованными класами.
+### Training
+Training is performed in [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb). ResNet-101 numpy implementation is trained on MNIST dataset. This notebook also features code that defines and traines a small convolutional neural network to demonstrate how to use the implemented classes in a general case.
 
-Результаты обучения resnet на numpy на графикe ниже.
+Training results of numpy resnet implementation are shown on the graph below.
 
 ![numpy resnet-101 results](./images_for_readme/numpy_resnet_results.png)
 
 
-### Обученная модель
-В [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) после каждой эпохи обучения формируется словарь model_optimizer_history:
-* 'model': модель в состоянии
-* 'optimizer': оптимизатор в состоянии
-* 'epoch_history': история обучения - словарь с ключами, соответствующими фазе обучения (в данном случае 'train' и 'test'), и значениями - словарями, отражающими историю фазы. Эти вложенные словари имеют названия метрик в качестве ключей и списки со значениями метрик на каждой эпохе в качестве значений.
-* 'model_info': словарь с информацией о модели и о гиперпараметрах обучения (например, использованном батчсайзе) 
+### Trained model
+The train function in [./numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) generates a model_optimizer_history dictionary after each epoch. This dictionary contains the following keys:
+* 'model': model (in state)
+* 'optimizer': optimizer (in state)
+* 'epoch_history': training history - a dictionary with keys corresponding to the training phase (in this case, 'train' and 'test'), and values - dictionaries reflecting the history of the phase. These nested dictionaries have metric names as keys and lists with metric values for each epoch as values
+* 'model_info': a dictionary with information about the model and hyperparameters of training (for example, the batch size used)
 
 Словарь model_optimizer_history сохраняется в файл `./numpy_nn/models/trained_models/resnet101/model_optimizer_history_dict.pickle`. Благодаря этому словарю можно продолжить обучение с эпохи, на которой оно было прервано, вывести график с историей обучения. 
 
