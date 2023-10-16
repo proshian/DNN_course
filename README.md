@@ -175,5 +175,5 @@ Minor todo tasks:
 
 
 ## Other branches:
-* `adabound-and-batchnorm` - returning batchnorm toresnet + experiments that compare Adam and Adabound
+* `adabound-and-batchnorm` - returning batchnorm to resnet + experiments that compare Adam and Adabound
 * `optimizers_take_parameters` - rewriting the code so that optimizers take neural network parameters as arguments instead of trainable layers
