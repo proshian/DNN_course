@@ -161,10 +161,6 @@ print("d_J_d_in all close:", np.allclose(d_J_d_in, input_torch.grad.detach().num
 * add loss test funciton
 * Check if test_stack_of_layers works
 
-* Update the readme
-    * translate README to English
-    * добавить раздел поясняющий как устроены тесты
-
 * Мб добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
 
 * Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 

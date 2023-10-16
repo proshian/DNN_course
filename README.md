@@ -160,10 +160,6 @@ The output and partial derivative of the loss function with respect to the input
 * add loss test funciton
 * Check if test_stack_of_layers works
 
-* Update the readme
-    * translate README to English
-    * добавить раздел поясняющий как устроены тесты
-
 * Мб добавить в скрипты проверку, есть ли необходимые модули в sys.path, если нет, сделать добавление
 
 * Когда батч-нормализация будет починена, удалить варианты resnet без батч-нормалищации 
