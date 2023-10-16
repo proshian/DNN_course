@@ -2,6 +2,12 @@
 
 ResNet-101 using numpy only
 
+## This readme in other languages
+
+* [Russian](README.ru.md)
+
+Note that only english version is guaranteed to be up-to-date.
+
 ## Root directory structure
 * [numpy_resnet_mnist.ipynb](./numpy_resnet_mnist.ipynb) - [numpy resnet implementation](./numpy_nn/models/resnet.py) training on MNIST using Adam optimizer
 * [numpy_nn](./numpy_nn)
