@@ -37,7 +37,7 @@ ResNet-101 включает в себя свертку conv1, макс пули�
 В conv1 размерность плоскости входного тензора уменьшается вдвое в связи с тем, что stride = 2. Перед conv2_1 производится даунсемплинг карты признаков (feature map) в 2 раза с помощью max pooling'а. Далее conv3_1, conv_4_1 и conv5_1 первая свертка bottleneck'а имеет stride = 2. Таким образом, ширина и высота сходного "изображения" сужаются в 32 раза перед тем как дойти до average pooling, который оставляет одно значение для каждого канала. Такой пулинг позволяет использовать входные данные произвольной размерности. Тем не менее, в связи с понижением размерности при проходе через сеть вход должен быть не менее 32 и, желательно, кратен 32 (иначе тензоры будут "обрезаться").
 -->
 
-## Resnet-101 numpy implementation (numpy_nn content) and trainig
+## Resnet-101 numpy implementation (numpy_nn content) and training
 ### Basic Layers
 Basic Layers of a neural network, optimizers and loss function are implemented in the directory [./numpy_nn/modules](./numpy_nn/modules).
 
@@ -134,7 +134,7 @@ There are two reasons why model and optimizer are saved in the same structure:
 2. If saved separately, the links between the model parameters and the optimizer are broken. To be more precise, between the layers of the neural network and the optimizer, because in this implementation, the optimizer requests the current parameters and gradients from layers. This means that identical layers would be stored in the optimizer and in the model, but they would be different objects and optimizer won't update model parameters. The solution to the problem would be to execute `optimizer.trainable_layers = model.trainable_layer` after loading the optimizer and model.
 3. Since the parameters need to be stored in both the model and the optimizer, saving to separate files would take up more memory
 
-## resnet-101 pytorch implementation
+## ResNet-101 pytorch implementation
 
 [./pytorch_nn/models/resnet.py](./pytorch_nn/models/resnet.py) implements resnet-101 using pytorch. It contains `Bottleneck` and `ResNet` classes and `resnet101` function similar to their numpy counterparts described above.
 
