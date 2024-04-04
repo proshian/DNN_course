@@ -720,7 +720,6 @@ class AdamOptimizer(Optimizer):
         self.epsilon = epsilon
         self.m = {}
         self.v = {}
-        self.t = 0
         for layer in self.trainable_layers:
             for param, _, id in layer.get_parameters_and_gradients_and_ids():
                 #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
@@ -740,7 +739,6 @@ class AdamOptimizer(Optimizer):
             for parameter, gradient, cache_id in layer.get_parameters_and_gradients_and_ids():
                 self.update(gradient, cache_id)
                 parameter -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
-        self.t += 1
 
 
 class GradientDescentOptimizer(Optimizer):
