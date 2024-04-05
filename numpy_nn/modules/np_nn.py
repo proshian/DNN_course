@@ -723,9 +723,9 @@ class AdamOptimizer(Optimizer):
         self.t = 0
         for layer in self.trainable_layers:
             for param, _, id in layer.get_parameters_and_gradients_and_ids():
-                #! I don't see any pros of using zeros_like instead of zeros, but decided to use it anyway.
-                # ! The params are used because they have the same shape as
-                # ! the gradients and are garanteed to be initialized.
+                # The params are used as shape source because they have 
+                # the same shape as the gradients and are garanteed 
+                # to be initialized.
                 self.m[id] = np.zeros_like(param)
                 self.v[id] = np.zeros_like(param)
     
@@ -734,13 +734,15 @@ class AdamOptimizer(Optimizer):
         self.v[cache_id] = self.beta2 * self.v[cache_id] + (1 - self.beta2) * gradient ** 2
         
     def step(self) -> None:
+        self.t += 1
         for layer in self.trainable_layers:
             #! Since np arrays are passed by reference the weights and bias
             # layer properties are going to be properly updated.
             for parameter, gradient, cache_id in layer.get_parameters_and_gradients_and_ids():
                 self.update(gradient, cache_id)
-                parameter -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
-        self.t += 1
+                m_corrected = self.m * (1 - self.beta1 ** self.t)
+                v_corrected = self.v * (1 - self.beta2 ** self.t)
+                parameter -= self.learning_rate * m_corrected / (np.sqrt(v_corrected) + self.epsilon)
 
 
 class GradientDescentOptimizer(Optimizer):
@@ -754,41 +756,6 @@ class GradientDescentOptimizer(Optimizer):
             # layer properties are going to be properly updated.
             for parameter, gradient, _ in layer.get_parameters_and_gradients_and_ids():
                 parameter -= self.learning_rate * gradient
-    
-# ! SequentialFullyConnected class is only used to maintain numpy_FC.ipynb.
-# The notebook and the class are going to be removed.
-class SequentialFullyConnected:
-    """
-    Feed forward neural network stack.
-    Attributes:
-        n_neurons: a list of integers that defines the number of neurons
-            in each layer including the input and output layers.
-        activations: a list of constructors of activation functions. They
-            are applied to the output of each layer. The length of
-            activations should be equal to the len(n_neurons) - 1.
-    """
-    def __init__(self, n_neurons: List[int], activations: List[Module]):
-        
-        self.n_neurons = n_neurons
-        self.activations = activations
-        self.trainable_layers = []
-        self.layers = []
-        for i in range(len(n_neurons) - 1):
-            fcl = FullyConnectedLayer(n_neurons[i], n_neurons[i+1])
-            self.layers.append(fcl)
-            self.trainable_layers.append(fcl)
-            self.layers.append(activations[i]())
-    
-    def forward(self, input_: np.ndarray) -> np.ndarray:
-        for layer in self.layers:
-            input_ = layer.forward(input_)
-        return input_
-    
-    def backward(self, output_gradient: np.ndarray) -> np.ndarray:
-        # ! I don't see any reason to omit the last layer. Have to check it.
-        for layer in reversed(self.layers[:-1]):
-            output_gradient = layer.backward(output_gradient)
-        return output_gradient
 
 
 class Sequential(Module):
@@ -818,3 +785,4 @@ class Sequential(Module):
     
     def get_trainable_layers(self) -> List[TrainableLayer]:
         return self.trainable_layers
+    
