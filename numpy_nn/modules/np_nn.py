@@ -720,6 +720,7 @@ class AdamOptimizer(Optimizer):
         self.epsilon = epsilon
         self.m = {}
         self.v = {}
+        self.t = 0
         for layer in self.trainable_layers:
             for param, _, id in layer.get_parameters_and_gradients_and_ids():
                 # The params are used as shape source because they have 
@@ -733,12 +734,15 @@ class AdamOptimizer(Optimizer):
         self.v[cache_id] = self.beta2 * self.v[cache_id] + (1 - self.beta2) * gradient ** 2
         
     def step(self) -> None:
+        self.t += 1
         for layer in self.trainable_layers:
             #! Since np arrays are passed by reference the weights and bias
             # layer properties are going to be properly updated.
             for parameter, gradient, cache_id in layer.get_parameters_and_gradients_and_ids():
                 self.update(gradient, cache_id)
-                parameter -= self.learning_rate * self.m[cache_id] / (np.sqrt(self.v[cache_id]) + self.epsilon)
+                m_corrected = self.m * (1 - self.beta1 ** self.t)
+                v_corrected = self.v * (1 - self.beta2 ** self.t)
+                parameter -= self.learning_rate * m_corrected / (np.sqrt(v_corrected) + self.epsilon)
 
 
 class GradientDescentOptimizer(Optimizer):
